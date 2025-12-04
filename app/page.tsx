@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, ReactNode } from 'react';
-import { BookOpen, Search, User, Send, FileText, AlertCircle, RefreshCw, Clock, ShieldAlert, CheckCircle, X, Timer, AlertTriangle, Notebook, ChevronLeft } from 'lucide-react';
+import { BookOpen, Search, User, Send, FileText, AlertCircle, RefreshCw, Clock, ShieldAlert, CheckCircle, X, Timer, AlertTriangle, Notebook, ChevronLeft, Skull, Microscope } from 'lucide-react';
 
 // --- [TYPES & INTERFACES] ---
 
@@ -18,10 +18,21 @@ interface Suspect {
   trick?: string;
 }
 
+interface VictimInfo {
+  name: string;
+  cause_of_death: string;
+  body_condition: string;
+  estimated_time_of_death: string;
+}
+
+interface Evidence {
+  name: string;
+  description: string;
+}
+
 interface WorldSetting {
   location: string;
   weather: string;
-  key_items: string[];
 }
 
 interface CaseData {
@@ -29,6 +40,8 @@ interface CaseData {
   summary: string;
   world_setting: WorldSetting;
   timeline_truth: string[];
+  victim_info: VictimInfo;
+  evidence_list: Evidence[];
   suspects: Suspect[];
   solution: string;
 }
@@ -52,7 +65,7 @@ interface Evaluation {
   feedback: string;
   truth: string;
   culpritName: string;
-  timeTaken: string; // [New] 소요 시간
+  timeTaken: string;
 }
 
 // --- [AI PROMPT LAYER] ---
@@ -62,7 +75,7 @@ const CASE_GENERATION_PROMPT = `
 플레이어(탐정)가 해결해야 할 단편 추리 시나리오를 JSON 포맷으로 생성하세요.
 
 [핵심 요구사항: 사실의 일관성]
-모든 용의자는 동일한 시공간에 존재했습니다. 따라서 '공간 구조'와 '시간의 흐름'은 절대적으로 일치해야 합니다.
+모든 용의자는 동일한 시공간에 존재했습니다. 따라서 '공간 구조', '시간의 흐름', '시신의 상태'는 절대적으로 일치해야 합니다.
 
 다음 JSON 스키마를 엄격히 준수하여 응답하세요 (Markdown 코드 블록 없이 순수 JSON만 출력):
 
@@ -72,9 +85,20 @@ const CASE_GENERATION_PROMPT = `
   
   "world_setting": {
     "location": "사건 현장의 구체적 구조 (예: 2층 저택. 1층 거실/주방, 2층 서재/침실. 서재는 복도 끝)",
-    "weather": "날씨와 분위기 (예: 폭우로 인한 고립, 천둥소리)",
-    "key_items": ["현장에 남은 결정적 증거 1", "증거 2"]
+    "weather": "날씨와 분위기 (예: 폭우로 인한 고립, 천둥소리)"
   },
+
+  "victim_info": {
+    "name": "피해자 이름",
+    "cause_of_death": "직접적인 사인 (예: 둔기에 의한 두부 손상)",
+    "body_condition": "시신의 상태 묘사 (예: 안경이 깨져 있고 바닥을 향해 엎드려 있음)",
+    "estimated_time_of_death": "사망 추정 시각"
+  },
+
+  "evidence_list": [
+    { "name": "증거물 이름 1", "description": "상세 묘사 (예: 3시 15분에 멈춘 손목시계)" },
+    { "name": "증거물 이름 2", "description": "상세 묘사" }
+  ],
 
   "timeline_truth": [
     "19:00 - 사건 발생 2시간 전 상황",
@@ -102,7 +126,7 @@ const CASE_GENERATION_PROMPT = `
       "secret": "...",
       "isCulprit": true,
       "motive": "범행 동기",
-      "trick": "world_setting을 활용한 트릭",
+      "trick": "world_setting과 evidence_list를 활용한 트릭",
       "real_action": "실제 범행 행동",
       "alibi_claim": "거짓 알리바이"
     },
@@ -379,6 +403,8 @@ export default function TodaysDetective() {
     const culprit = caseData.suspects.find(s => s.isCulprit);
     if (!culprit) return; 
 
+    const isCorrect = chosenSuspect.isCulprit;
+
     const penaltyInstruction = isOverTime 
       ? "\n[중요 페널티]: 플레이어가 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '탐정 등급'은 최대 'B'까지만 부여할 수 있습니다. 피드백에 '시간 초과로 인한 등급 하락'을 언급하세요." 
       : "";
@@ -411,7 +437,7 @@ export default function TodaysDetective() {
       feedback: evalResult || "평가 데이터를 불러오는데 실패했습니다.",
       truth: caseData.solution,
       culpritName: chosenSuspect.name,
-      timeTaken: timeTakenStr // [New]
+      timeTaken: timeTakenStr 
     });
     setPhase('resolution');
   };
@@ -567,10 +593,12 @@ export default function TodaysDetective() {
       <MobileLayout>
         <div className="h-full bg-gray-900 text-gray-900 p-4 font-serif overflow-y-auto">
           <div className="w-full bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform rotate-1 mt-4 mb-8">
+            {/* Paper Texture Overlay */}
             <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-multiply" 
                  style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/aged-paper.png")'}}></div>
             
             <div className="p-8 relative z-10">
+              {/* Header */}
               <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
                 <div>
                   <span className="bg-red-800 text-white text-[10px] px-2 py-1 font-bold tracking-widest uppercase">Top Secret</span>
@@ -581,6 +609,7 @@ export default function TodaysDetective() {
                 </div>
               </div>
 
+              {/* Content */}
               <div className="space-y-8">
                 <section>
                   <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
@@ -589,6 +618,49 @@ export default function TodaysDetective() {
                   <p className="text-base leading-relaxed font-medium text-gray-800 border-l-4 border-amber-800/30 pl-4">
                     {caseData.summary}
                   </p>
+                </section>
+
+                {/* Victim Info (Autopsy Report) */}
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                    <Skull size={14} /> Autopsy Report
+                  </h3>
+                  <div className="bg-black/5 p-4 rounded-sm border border-black/10 text-sm space-y-2">
+                    <div className="flex justify-between border-b border-black/10 pb-1">
+                      <span className="font-bold text-gray-700">Name:</span>
+                      <span>{caseData.victim_info.name}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/10 pb-1">
+                      <span className="font-bold text-gray-700">Time of Death:</span>
+                      <span>{caseData.victim_info.estimated_time_of_death}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-700 block mb-1">Cause of Death:</span>
+                      <span className="block pl-2 text-gray-800">{caseData.victim_info.cause_of_death}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-gray-700 block mb-1">Body Condition:</span>
+                      <span className="block pl-2 text-gray-800">{caseData.victim_info.body_condition}</span>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Evidence List */}
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                    <Microscope size={14} /> Initial Evidence
+                  </h3>
+                  <div className="space-y-2">
+                    {caseData.evidence_list.map((item, idx) => (
+                      <div key={idx} className="bg-white/50 p-3 rounded-sm border border-black/5 flex gap-3 items-start">
+                        <div className="w-1 h-full bg-amber-800 rounded-full shrink-0"></div>
+                        <div>
+                          <div className="font-bold text-sm text-gray-900">{item.name}</div>
+                          <div className="text-xs text-gray-600">{item.description}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </section>
 
                 <section>
@@ -844,7 +916,7 @@ export default function TodaysDetective() {
             </div>
 
             <div className="flex gap-3">
-              {/* [New] Back Button with Clearer Label */}
+              {/* Back Button with Clearer Label */}
               <button 
                 onClick={() => setPhase('investigation')}
                 className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-4 rounded-sm transition-colors text-xs flex items-center justify-center gap-1"
@@ -901,7 +973,7 @@ export default function TodaysDetective() {
                 </div>
                 <div className="flex justify-between px-2 pt-1 font-mono text-[9px] text-gray-500">
                   <span>{new Date().toLocaleDateString()}</span>
-                  {/* [New] Time Taken Display */}
+                  {/* Time Taken Display */}
                   <span className="font-bold text-gray-700">Time: {evaluation.timeTaken}</span>
                 </div>
               </div>
