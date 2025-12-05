@@ -238,7 +238,7 @@ export default function TodaysDetective() {
   const [deductionInput, setDeductionInput] = useState<DeductionInput>({ culpritId: null, reasoning: "" });
   const [isMuted, setIsMuted] = useState<boolean>(false);
   
-  // Error & Retry State [New]
+  // Error & Retry State
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
   
@@ -318,7 +318,6 @@ export default function TodaysDetective() {
   };
 
   // --- ERROR HANDLING WRAPPER ---
-  // API 호출 실패 시 에러 상태를 설정하고 재시도 함수를 저장
   const withErrorHandling = async (action: () => Promise<void>) => {
     try {
       setErrorMsg(null);
@@ -326,7 +325,7 @@ export default function TodaysDetective() {
     } catch (e) {
       console.error("Game Error:", e);
       setErrorMsg("본부와의 통신이 끊겼습니다.");
-      setRetryAction(() => () => withErrorHandling(action)); // Wrap again for subsequent retries
+      setRetryAction(() => () => withErrorHandling(action)); 
     }
   };
 
@@ -339,7 +338,6 @@ export default function TodaysDetective() {
       audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
     }
 
-    // Background fetch doesn't block UI immediately, so we handle error inside
     callGemini(CASE_GENERATION_PROMPT).then(resultText => {
       const data = parseJSON(resultText);
       if (data && data.suspects) {
@@ -347,7 +345,6 @@ export default function TodaysDetective() {
       }
     }).catch(err => {
       console.error("Background Fetch Error:", err);
-      // 백그라운드 에러는 일단 무시하고 로딩 화면에서 재시도하게 됨
     });
   };
 
@@ -372,7 +369,6 @@ export default function TodaysDetective() {
       finalizeGameStart(preloadedData);
     } else {
       setPhase('loading');
-      // If no preloaded data, try fetching again with error handling visibility
       if (!caseData) {
         withErrorHandling(async () => {
            const resultText = await callGemini(CASE_GENERATION_PROMPT);
@@ -444,7 +440,6 @@ export default function TodaysDetective() {
       ? "\n[중요 페널티]: 플레이어가 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '탐정 등급'은 최대 'B'까지만 부여할 수 있습니다." 
       : "";
 
-    // [Update] Evaluation Prompt for standardized output
     const evalPrompt = `
       [사건 진상]
       ${caseData.solution}
@@ -474,8 +469,6 @@ export default function TodaysDetective() {
     
     const evalResult = await callGemini(evalPrompt);
     
-    // Parse the standardized result
-    const judgment = evalResult.match(/\[JUDGMENT\]\s*(.*)/)?.[1] || (isCorrect ? "성공" : "실패");
     const grade = evalResult.match(/\[GRADE\]\s*(.*)/)?.[1] || "F";
     const report = evalResult.match(/\[REPORT\]\s*([\s\S]*?)(?=\[ADVICE\]|$)/)?.[1]?.trim() || "보고서 생성 실패";
     const advice = evalResult.match(/\[ADVICE\]\s*([\s\S]*)/)?.[1]?.trim() || "조언을 불러올 수 없습니다.";
@@ -496,18 +489,8 @@ export default function TodaysDetective() {
   });
 
   const resetGame = () => {
-    setPhase('intro');
-    setCaseData(null);
-    setPreloadedData(null);
-    setActionPoints(20);
-    setTimerSeconds(600); 
-    setIsOverTime(false);
-    setShowTimeOverModal(false);
-    setChatLogs({ 0: [], 1: [], 2: [], 3: [] });
-    setDeductionInput({ culpritId: null, reasoning: "" });
-    setEvaluation(null);
-    setCurrentSuspectId(1);
-    setErrorMsg(null);
+    // Force reload to clear all states, intervals, and potential lingering effects
+    window.location.reload();
   };
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
