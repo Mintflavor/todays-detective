@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, KeyboardEvent, ChangeEvent } from 'react';
 import { BookOpen, Search, User, Send, FileText, AlertCircle, RefreshCw, Clock, ShieldAlert, CheckCircle, X, Timer, AlertTriangle, Notebook, ChevronLeft, Skull, Microscope, Volume2, VolumeX, WifiOff } from 'lucide-react';
 
 // --- [TYPES & INTERFACES] ---
@@ -79,6 +79,9 @@ const CASE_GENERATION_PROMPT = `
 [핵심 요구사항: 사실의 일관성]
 모든 용의자는 동일한 시공간에 존재했습니다. 따라서 '공간 구조', '시간의 흐름', '시신의 상태'는 절대적으로 일치해야 합니다.
 
+[이름 표기 규칙]
+모든 인물의 이름(피해자, 용의자)은 괄호나 영문 병기 없이 **순수 한글**로만 작성하세요. 외국인이라도 한글 발음으로만 표기하세요. (예: '김철수', '제임스 박')
+
 다음 JSON 스키마를 엄격히 준수하여 응답하세요 (Markdown 코드 블록 없이 순수 JSON만 출력):
 
 {
@@ -91,7 +94,7 @@ const CASE_GENERATION_PROMPT = `
   },
 
   "victim_info": {
-    "name": "피해자 이름",
+    "name": "피해자 이름 (순수 한글)",
     "cause_of_death": "직접적인 사인 (예: 둔기에 의한 두부 손상)",
     "body_condition": "시신의 상태 묘사 (예: 안경이 깨져 있고 바닥을 향해 엎드려 있음)",
     "estimated_time_of_death": "사망 추정 시각"
@@ -112,7 +115,7 @@ const CASE_GENERATION_PROMPT = `
   "suspects": [
     {
       "id": 1,
-      "name": "이름",
+      "name": "이름 (순수 한글)",
       "role": "직업 또는 관계",
       "personality": "성격 묘사",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심 살만한 행동)",
@@ -122,7 +125,7 @@ const CASE_GENERATION_PROMPT = `
     },
     {
       "id": 2,
-      "name": "이름",
+      "name": "이름 (순수 한글)",
       "role": "직업/관계",
       "personality": "...",
       "secret": "...",
@@ -134,7 +137,7 @@ const CASE_GENERATION_PROMPT = `
     },
     {
       "id": 3,
-      "name": "이름",
+      "name": "이름 (순수 한글)",
       "role": "직업/관계",
       "personality": "...",
       "secret": "...",
@@ -211,6 +214,12 @@ const getRandomPlaceholder = (): string => {
   return prompts[Math.floor(Math.random() * prompts.length)];
 };
 
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 // --- [MAIN COMPONENT] ---
 
 export default function TodaysDetective() {
@@ -220,7 +229,7 @@ export default function TodaysDetective() {
   // Game Data State
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [preloadedData, setPreloadedData] = useState<CaseData | null>(null);
-  const [currentSuspectId, setCurrentSuspectId] = useState<number>(1); 
+  const [currentSuspectId, setCurrentSuspectId] = useState<number>(1); // 0 = Note(Self), 1~3 = Suspects
   const [chatLogs, setChatLogs] = useState<ChatLogs>({ 0: [], 1: [], 2: [], 3: [] });
   const [actionPoints, setActionPoints] = useState<number>(20);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
@@ -234,6 +243,7 @@ export default function TodaysDetective() {
   const [userInput, setUserInput] = useState<string>("");
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const [loadingText, setLoadingText] = useState<string>("현장 보존 중...");
+  const [loadingType, setLoadingType] = useState<'case' | 'deduction'>('case');
   const [inputPlaceholder, setInputPlaceholder] = useState<string>("");
   const [deductionInput, setDeductionInput] = useState<DeductionInput>({ culpritId: null, reasoning: "" });
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -261,17 +271,48 @@ export default function TodaysDetective() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLogs, currentSuspectId, isTyping]);
 
+  // Loading Text Cycle (Updated with variety and 3s interval)
   useEffect(() => {
     if (phase === 'loading') {
-      const texts = ["현장 보존 중...", "용의자 신원 조회 중...", "부검 리포트 작성 중...", "CCTV 확보 중..."];
+      let texts: string[] = [];
+      if (loadingType === 'case') {
+        texts = [
+          "현장 보존선 설치 중...",
+          "용의자 신원 조회 중...",
+          "부검 리포트 요청 중...",
+          "인근 CCTV 영상 확보 중...",
+          "목격자 탐문 수사 중...",
+          "지문 감식 결과 대기 중...",
+          "과거 범죄 기록 열람 중...",
+          "사건 현장 3D 스캔 중...",
+          "통신 기록 조회 중...",
+          "알리바이 1차 검증 중..."
+        ];
+      } else {
+        texts = [
+          "최종 추리 논리 검증 중...",
+          "용의자 알리바이 재확인 중...",
+          "범행 트릭 시뮬레이션 중...",
+          "증거물과 진술 대조 중...",
+          "범행 동기 타당성 분석 중...",
+          "최종 수사 보고서 작성 중...",
+          "검찰 송치 서류 준비 중...",
+          "사건의 진상을 재구성하는 중...",
+          "모순점 최종 확인 중..."
+        ];
+      }
+      
       let i = 0;
+      // 첫 로딩 텍스트 즉시 설정 (선택적)
+      // setLoadingText(texts[0]); 
+      
       const interval = setInterval(() => {
         i = (i + 1) % texts.length;
         setLoadingText(texts[i]);
-      }, 1500);
+      }, 3000); // 3초 간격
       return () => clearInterval(interval);
     }
-  }, [phase]);
+  }, [phase, loadingType]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -307,12 +348,6 @@ export default function TodaysDetective() {
     }
   }, [chatLogs, currentSuspectId]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const toggleMute = () => {
     setIsMuted(!isMuted);
   };
@@ -333,6 +368,7 @@ export default function TodaysDetective() {
 
   const handleStartGame = () => {
     setPhase('tutorial');
+    // Try to autoplay audio on first interaction
     if (audioRef.current) {
       audioRef.current.volume = 0.3; 
       audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
@@ -368,7 +404,10 @@ export default function TodaysDetective() {
     if (preloadedData) {
       finalizeGameStart(preloadedData);
     } else {
+      setLoadingType('case'); // 사건 생성 로딩 모드
+      setLoadingText("사건 파일을 불러오는 중..."); // 초기 텍스트 리셋
       setPhase('loading');
+      
       if (!caseData) {
         withErrorHandling(async () => {
            const resultText = await callGemini(CASE_GENERATION_PROMPT);
@@ -386,6 +425,7 @@ export default function TodaysDetective() {
   const handleSendMessage = () => withErrorHandling(async () => {
     if (!userInput.trim() || isTyping || !caseData) return;
     
+    // Note tab logic
     if (currentSuspectId === 0) {
       setChatLogs(prev => ({
         ...prev,
@@ -425,8 +465,9 @@ export default function TodaysDetective() {
   const submitDeduction = () => withErrorHandling(async () => {
     if (!caseData || !deductionInput.culpritId) return;
 
+    setLoadingType('deduction'); // 추리 분석 로딩 모드
+    setLoadingText("최종 추리 보고서 작성 중..."); // 초기 텍스트 리셋
     setPhase('loading');
-    setLoadingText("최종 추리 보고서 작성 중...");
     
     const chosenSuspect = caseData.suspects.find(s => s.id === deductionInput.culpritId);
     if (!chosenSuspect) return;
@@ -489,7 +530,6 @@ export default function TodaysDetective() {
   });
 
   const resetGame = () => {
-    // Force reload to clear all states, intervals, and potential lingering effects
     window.location.reload();
   };
 
@@ -579,7 +619,7 @@ export default function TodaysDetective() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 p-6">
         {renderErrorModal()}
-        <div className="w-full max-w-md bg-[#f0e6d2] text-gray-900 rounded-sm shadow-2xl overflow-hidden relative rotate-1 animate-fade-in">
+        <div className="w-full max-w-md bg-[#f0e6d2] text-gray-900 rounded-sm shadow-2xl overflow-hidden relative md:rotate-1 animate-fade-in">
           <div className="bg-amber-900 text-amber-100 p-4 border-b-4 border-amber-800 flex items-center gap-2">
             <BookOpen size={20} />
             <h2 className="font-serif font-bold text-xl tracking-wider">수사 수칙 (Manual)</h2>
@@ -653,7 +693,7 @@ export default function TodaysDetective() {
     return (
       <div className="min-h-screen bg-gray-900 text-gray-900 p-4 font-serif overflow-y-auto">
         {renderErrorModal()}
-        <div className="max-w-2xl mx-auto bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform rotate-1 mt-4 mb-8">
+        <div className="max-w-2xl mx-auto bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform md:rotate-1 mt-4 mb-8">
           <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-multiply" 
                style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/aged-paper.png")'}}></div>
           
@@ -1048,6 +1088,7 @@ export default function TodaysDetective() {
             {/* Right: Typewriter Report (Standardized UI) */}
             <div className="w-full md:w-2/3 space-y-6">
               
+              {/* AI Feedback */}
               <div className="bg-[#f0e6d2] text-gray-900 p-6 shadow-xl rounded-sm relative" style={{ fontFamily: '"Courier New", Courier, monospace' }}>
                 <div className="absolute top-0 right-0 p-2 opacity-20">
                   <FileText size={48} />
