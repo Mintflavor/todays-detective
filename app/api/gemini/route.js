@@ -18,12 +18,12 @@ export async function POST(req) {
     });
 
     const data = await response.json();
-
-    // 3. 결과를 프론트엔드로 전달
-    return NextResponse.json(data);
-    
+    return Response.json(data);
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error("---------- GEMINI API ERROR ----------");
+    console.error("Prompt:", body.prompt);
+    console.error("Error:", error);
+    console.error("--------------------------------------");
+    return Response.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
