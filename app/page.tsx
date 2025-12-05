@@ -76,11 +76,10 @@ const CASE_GENERATION_PROMPT = `
 당신은 하드보일드 미스터리 소설의 거장입니다.
 플레이어(탐정)가 해결해야 할 단편 추리 시나리오를 JSON 포맷으로 생성하세요.
 
-[핵심 요구사항: 사실의 일관성]
-모든 용의자는 동일한 시공간에 존재했습니다. 따라서 '공간 구조', '시간의 흐름', '시신의 상태'는 절대적으로 일치해야 합니다.
-
-[이름 표기 규칙]
-모든 인물의 이름(피해자, 용의자)은 괄호나 영문 병기 없이 **순수 한글**로만 작성하세요. 외국인이라도 한글 발음으로만 표기하세요. (예: '김철수', '제임스 박')
+[핵심 요구사항]
+1. 사실의 일관성: 모든 용의자는 동일한 시공간에 존재했습니다. 공간 구조, 시간의 흐름, 시신의 상태는 절대적으로 일치해야 합니다.
+2. 다양성: **살인, 강도, 절도, 방화, 납치 등 다양한 강력 범죄 중 하나를 랜덤하게 선택**하여 시나리오를 작성하세요. (단순 살인 사건만 반복하지 말 것)
+3. 이름 표기: 모든 인물의 이름은 괄호나 영문 병기 없이 **순수 한글**로만 작성하세요. (예: '김철수', '제임스 박')
 
 다음 JSON 스키마를 엄격히 준수하여 응답하세요 (Markdown 코드 블록 없이 순수 JSON만 출력):
 
@@ -95,21 +94,22 @@ const CASE_GENERATION_PROMPT = `
 
   "victim_info": {
     "name": "피해자 이름 (순수 한글)",
-    "cause_of_death": "직접적인 사인 (예: 둔기에 의한 두부 손상)",
-    "body_condition": "시신의 상태 묘사 (예: 안경이 깨져 있고 바닥을 향해 엎드려 있음)",
-    "estimated_time_of_death": "사망 추정 시각"
+    "cause_of_death": "직접적인 사인 또는 피해 내용 (예: 둔기에 의한 두부 손상, 금고 털림)",
+    "body_condition": "시신 또는 현장의 상태 묘사 (예: 안경이 깨져 있고 바닥을 향해 엎드려 있음)",
+    "estimated_time_of_death": "사건 발생 추정 시각"
   },
 
   "evidence_list": [
     { "name": "증거물 이름 1", "description": "상세 묘사 (예: 3시 15분에 멈춘 손목시계)" },
     { "name": "증거물 이름 2", "description": "상세 묘사" }
+    // (증거물은 최대 3개까지만 생성하세요)
   ],
 
   "timeline_truth": [
     "19:00 - 사건 발생 2시간 전 상황",
     "20:00 - 사건 발생 직전 상황 (갈등 심화)",
     "20:30 - 사건 발생 추정 시각 및 특이사항 (예: 정전, 소음)",
-    "21:00 - 시신 발견"
+    "21:00 - 사건 발각"
   ],
 
   "suspects": [
@@ -146,7 +146,7 @@ const CASE_GENERATION_PROMPT = `
       "alibi_claim": "..."
     }
   ],
-  "solution": "사건의 전말 (누가, 왜, 어떻게 죽였는지 논리적 해설)"
+  "solution": "사건의 전말 (누가, 왜, 어떻게 범행을 저질렀는지 논리적 해설)"
 }
 
 언어: 한국어(Korean)
@@ -271,7 +271,7 @@ export default function TodaysDetective() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLogs, currentSuspectId, isTyping]);
 
-  // Loading Text Cycle (Updated with variety and 3s interval)
+  // Loading Text Cycle
   useEffect(() => {
     if (phase === 'loading') {
       let texts: string[] = [];
@@ -303,20 +303,19 @@ export default function TodaysDetective() {
       }
       
       let i = 0;
-      // 첫 로딩 텍스트 즉시 설정 (선택적)
-      // setLoadingText(texts[0]); 
-      
       const interval = setInterval(() => {
         i = (i + 1) % texts.length;
         setLoadingText(texts[i]);
-      }, 3000); // 3초 간격
+      }, 3000); 
       return () => clearInterval(interval);
     }
   }, [phase, loadingType]);
 
+  // Timer Countdown Logic (Modified: Pauses when AI is typing)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (phase === 'investigation' && timerSeconds > 0) {
+    // Check isTyping to pause timer
+    if (phase === 'investigation' && timerSeconds > 0 && !isTyping) {
       interval = setInterval(() => {
         setTimerSeconds((prev) => {
           if (prev <= 1) {
@@ -330,7 +329,7 @@ export default function TodaysDetective() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [phase, timerSeconds]);
+  }, [phase, timerSeconds, isTyping]);
 
   useEffect(() => {
     if (phase === 'loading' && preloadedData) {
@@ -368,7 +367,6 @@ export default function TodaysDetective() {
 
   const handleStartGame = () => {
     setPhase('tutorial');
-    // Try to autoplay audio on first interaction
     if (audioRef.current) {
       audioRef.current.volume = 0.3; 
       audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
@@ -404,8 +402,8 @@ export default function TodaysDetective() {
     if (preloadedData) {
       finalizeGameStart(preloadedData);
     } else {
-      setLoadingType('case'); // 사건 생성 로딩 모드
-      setLoadingText("사건 파일을 불러오는 중..."); // 초기 텍스트 리셋
+      setLoadingType('case'); 
+      setLoadingText("사건 파일을 불러오는 중..."); 
       setPhase('loading');
       
       if (!caseData) {
@@ -446,7 +444,7 @@ export default function TodaysDetective() {
     }));
     setUserInput("");
     setActionPoints(prev => prev - 1);
-    setIsTyping(true);
+    setIsTyping(true); // Timer will pause here due to useEffect dependency
 
     const systemPrompt = generateSuspectPrompt(suspect, caseData.world_setting, caseData.timeline_truth);
     const history = chatLogs[currentSuspectId].map(msg => 
@@ -455,7 +453,7 @@ export default function TodaysDetective() {
     const fullPrompt = `${systemPrompt}\n\n[이전 대화]\n${history}\n\n탐정: ${userMsg}\n용의자:`;
     
     const reply = await callGemini(fullPrompt);
-    setIsTyping(false);
+    setIsTyping(false); // Timer resumes
     setChatLogs(prev => ({
       ...prev,
       [currentSuspectId]: [...prev[currentSuspectId], { role: 'ai', text: reply }]
@@ -465,8 +463,8 @@ export default function TodaysDetective() {
   const submitDeduction = () => withErrorHandling(async () => {
     if (!caseData || !deductionInput.culpritId) return;
 
-    setLoadingType('deduction'); // 추리 분석 로딩 모드
-    setLoadingText("최종 추리 보고서 작성 중..."); // 초기 텍스트 리셋
+    setLoadingType('deduction'); 
+    setLoadingText("최종 추리 보고서 작성 중..."); 
     setPhase('loading');
     
     const chosenSuspect = caseData.suspects.find(s => s.id === deductionInput.culpritId);
@@ -784,7 +782,7 @@ export default function TodaysDetective() {
                 onClick={() => setPhase('investigation')}
                 className="w-full bg-gray-900 hover:bg-black text-[#eaddcf] font-bold py-4 px-6 rounded-sm shadow-xl transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 border border-gray-700"
               >
-                수사 시작 (AP: 20) <Send size={16} />
+                수사 시작 <Send size={16} />
               </button>
             </div>
           </div>
