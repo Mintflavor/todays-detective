@@ -100,7 +100,7 @@ const CASE_GENERATION_PROMPT = `
   },
 
   "evidence_list": [
-    { "name": "증거물 이름 1", "description": "상세 묘사 (예: 3시 15분에 멈춘 손목시계)" },
+    { "name": "증거물 이름 1", "description": "상세 묘사 (중요: 이름, 이니셜, 생년월일 등 범인을 바로 특정할 수 있는 직접적인 단서는 절대 포함하지 마세요. 간접적인 정황 증거여야 합니다.)" },
     { "name": "증거물 이름 2", "description": "상세 묘사" }
     // (증거물은 최대 3개까지만 생성하세요)
   ],
@@ -146,7 +146,7 @@ const CASE_GENERATION_PROMPT = `
       "alibi_claim": "..."
     }
   ],
-  "solution": "사건의 전말 (누가, 왜, 어떻게 범행을 저질렀는지 논리적 해설)"
+  "solution": "사건의 전말 (누가, 왜, 어떻게 범행을 저질렀는지 논리적 해설. 이 내용은 게임이 끝날 때까지 절대 변하면 안 됩니다.)"
 }
 
 언어: 한국어(Korean)
@@ -157,8 +157,9 @@ const generateSuspectPrompt = (suspect: Suspect, world: WorldSetting, timeline: 
 탐정(플레이어)이 당신을 심문하고 있습니다.
 
 [절대적 사실 - 당신의 기억 속에 명확히 존재합니다]
+이 설정은 절대 변하지 않으며, 당신은 이 세계관 안에서만 대답해야 합니다.
 1. 장소 구조: ${world.location}
-   - 경고: 위 묘사에 없는 방이나 구조를 절대 지어내지 마세요.
+   - 경고: 위 묘사에 없는 방이나 구조를 절대 지어내지 마세요. 모르면 "모른다"고 답하세요.
 2. 당시 상황: ${world.weather}
 3. 공통 타임라인:
    ${timeline.join('\n')}
@@ -173,7 +174,8 @@ const generateSuspectPrompt = (suspect: Suspect, world: WorldSetting, timeline: 
 
 [대화 지침]
 - 답변은 구어체로 자연스럽게, 2문장 이내로 짧게 하세요.
-- 플레이어가 구체적인 물건/장소를 물어보면 [절대적 사실]에 근거해 답하세요. 모르면 "모른다"고 하세요.
+- 플레이어가 구체적인 물건/장소를 물어보면 [절대적 사실]에 근거해 답하세요.
+- [절대적 사실]에 없는 내용은 상상해서 지어내지 말고 "기억이 안 난다", "모르겠다"고 회피하세요.
 `;
 
 // --- [HELPER FUNCTIONS] ---
@@ -311,7 +313,7 @@ export default function TodaysDetective() {
     }
   }, [phase, loadingType]);
 
-  // Timer Countdown Logic (Modified: Pauses when AI is typing)
+  // Timer Countdown Logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
     // Check isTyping to pause timer
@@ -444,7 +446,7 @@ export default function TodaysDetective() {
     }));
     setUserInput("");
     setActionPoints(prev => prev - 1);
-    setIsTyping(true); // Timer will pause here due to useEffect dependency
+    setIsTyping(true);
 
     const systemPrompt = generateSuspectPrompt(suspect, caseData.world_setting, caseData.timeline_truth);
     const history = chatLogs[currentSuspectId].map(msg => 
@@ -453,7 +455,7 @@ export default function TodaysDetective() {
     const fullPrompt = `${systemPrompt}\n\n[이전 대화]\n${history}\n\n탐정: ${userMsg}\n용의자:`;
     
     const reply = await callGemini(fullPrompt);
-    setIsTyping(false); // Timer resumes
+    setIsTyping(false);
     setChatLogs(prev => ({
       ...prev,
       [currentSuspectId]: [...prev[currentSuspectId], { role: 'ai', text: reply }]
@@ -479,9 +481,16 @@ export default function TodaysDetective() {
       ? "\n[중요 페널티]: 플레이어가 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '탐정 등급'은 최대 'B'까지만 부여할 수 있습니다." 
       : "";
 
+    // [강화된 평가 프롬프트]
     const evalPrompt = `
-      [사건 진상]
+      [절대 원칙: 사실 왜곡 금지]
+      당신은 냉철한 판사입니다. 아래 제공된 [사건의 진상]을 유일한 정답으로 간주해야 합니다.
+      AI가 생성한 것이라도, 기존에 설정된 사건의 진상과 다른 내용을 새로 창조해내지 마십시오.
+      플레이어의 추리가 [사건의 진상]과 일치하는지만을 판단하세요.
+
+      [사건의 진상 (Ground Truth)]
       ${caseData.solution}
+      
       진범: ${culprit.name}
 
       [플레이어의 추리]
