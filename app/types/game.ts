@@ -38,6 +38,7 @@ export interface CaseData {
   evidence_list: Evidence[];
   suspects: Suspect[];
   solution: string;
+  caseNumber?: string;
 }
 
 export interface ChatMessage {
@@ -62,7 +63,8 @@ export interface Evaluation {
   truth: string;
   culpritName: string;
   timeTaken: string;
+  caseNumber?: string;
 }
 
-export type GamePhase = 'intro' | 'tutorial' | 'loading' | 'briefing' | 'investigation' | 'deduction' | 'resolution';
+export type GamePhase = 'intro' | 'load_menu' | 'tutorial' | 'loading' | 'briefing' | 'investigation' | 'deduction' | 'resolution';
 export type LoadingType = 'case' | 'deduction';

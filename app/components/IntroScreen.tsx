@@ -1,14 +1,15 @@
 import React from 'react';
 import Image from 'next/image';
-import { Search, FileText, VolumeX, Volume2 } from 'lucide-react';
+import { Search, FileText, VolumeX, Volume2, Archive } from 'lucide-react';
 
 interface IntroScreenProps {
   onStart: () => void;
+  onLoadGame: () => void;
   isMuted: boolean;
   toggleMute: () => void;
 }
 
-export default function IntroScreen({ onStart, isMuted, toggleMute }: IntroScreenProps) {
+export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }: IntroScreenProps) {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-100 p-6 relative overflow-hidden font-sans">
       {/* Background Image */}
@@ -20,7 +21,7 @@ export default function IntroScreen({ onStart, isMuted, toggleMute }: IntroScree
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gray-900/70" />
+        <div className="absolute inset-0 bg-gray-900/90" />
       </div>
 
       {/* Sound Toggle (Absolute) */}
@@ -49,12 +50,21 @@ export default function IntroScreen({ onStart, isMuted, toggleMute }: IntroScree
           </div>
         </div>
         
-        <button 
-          onClick={onStart}
-          className="w-full bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-4 px-6 rounded-sm shadow-lg border border-amber-600 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 font-serif text-lg"
-        >
-          <FileText size={20} /> 사건 파일 열기
-        </button>
+        <div className="space-y-4 w-full">
+          <button 
+            onClick={onStart}
+            className="w-full bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-4 px-6 rounded-sm shadow-lg border border-amber-600 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 font-serif text-lg"
+          >
+            <FileText size={20} /> 새로운 의뢰
+          </button>
+
+          <button 
+            onClick={onLoadGame}
+            className="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold py-4 px-6 rounded-sm shadow-lg border border-gray-600 transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 font-serif text-lg"
+          >
+            <Archive size={20} /> 사건 기록실
+          </button>
+        </div>
       </div>
     </div>
   );

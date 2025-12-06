@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import useGameEngine from './hooks/useGameEngine';
 import IntroScreen from './components/IntroScreen';
+import LoadScenarioScreen from './components/LoadScenarioScreen';
 import TutorialModal from './components/TutorialModal';
 import LoadingScreen from './components/LoadingScreen';
 import BriefingScreen from './components/BriefingScreen';
@@ -40,6 +41,8 @@ export default function TodaysDetective() {
     resetGame,
     handleInputChange,
     handleKeyDown,
+    goToLoadMenu,
+    handleLoadGame,
   } = useGameEngine();
 
   return (
@@ -57,9 +60,17 @@ export default function TodaysDetective() {
       {/* Screen Routing */}
       {phase === 'intro' && (
         <IntroScreen 
-          onStart={handleStartGame} 
+          onStart={handleStartGame}
+          onLoadGame={goToLoadMenu} 
           isMuted={isMuted} 
           toggleMute={toggleMute} 
+        />
+      )}
+
+      {phase === 'load_menu' && (
+        <LoadScenarioScreen
+          onLoad={handleLoadGame}
+          onBack={() => setPhase('intro')}
         />
       )}
 

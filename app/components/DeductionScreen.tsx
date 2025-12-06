@@ -29,7 +29,7 @@ export default function DeductionScreen({
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gray-900/70" />
+        <div className="absolute inset-0 bg-gray-900/90" />
       </div>
 
       <div className="w-full max-w-lg bg-gray-800 rounded-sm p-6 shadow-2xl border border-gray-700 relative my-auto z-10">
@@ -87,7 +87,7 @@ export default function DeductionScreen({
             disabled={!deductionInput.culpritId || !deductionInput.reasoning}
             className="flex-[2] bg-red-800 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-4 rounded-sm shadow-xl text-sm tracking-widest transition-all"
           >
-            제출 (SUBMIT)
+            제출
           </button>
         </div>
       </div>

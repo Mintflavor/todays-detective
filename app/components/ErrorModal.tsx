@@ -23,8 +23,7 @@ export default function ErrorModal({ errorMsg, onRetry, setErrorMsg }: ErrorModa
           }}
           className="w-full bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2"
         >
-          <RefreshCw size={18} /> 재접속 시도 (Retry)
-        </button>
+                      <RefreshCw size={18} /> 재접속 시도        </button>
       </div>
     </div>
   );

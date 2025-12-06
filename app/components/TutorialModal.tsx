@@ -11,24 +11,24 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
       <div className="w-full max-w-md bg-[#f0e6d2] text-gray-900 rounded-sm shadow-2xl overflow-hidden relative md:rotate-1 animate-fade-in">
         <div className="bg-amber-900 text-amber-100 p-4 border-b-4 border-amber-800 flex items-center gap-2">
           <BookOpen size={20} />
-          <h2 className="font-serif font-bold text-xl tracking-wider">수사 수칙 (Manual)</h2>
+          <h2 className="font-serif font-bold text-xl tracking-wider">수사 수칙</h2>
         </div>
 
         <div className="p-6 space-y-6 font-serif">
           <div>
             <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2">
-              <ShieldAlert size={18} /> 목표 (Goal)
+              <ShieldAlert size={18} /> 목표
             </h3>
             <p className="text-sm leading-relaxed text-gray-800">
               단순히 범인을 찍는 것이 아닙니다. <br/>
-              <span className="font-bold border-b border-black">누가(Who), 왜(Why), 어떻게(How)</span> <br/>
+              <span className="font-bold border-b border-black">누가, 왜, 어떻게</span> <br/>
               세 가지를 모두 밝혀내야 최고의 등급을 받습니다.
             </p>
           </div>
 
           <div>
             <h3 className="font-bold text-amber-900 flex items-center gap-2 mb-2">
-              <Clock size={18} /> 자원 및 시간 (Resources)
+              <Clock size={18} /> 자원 및 시간
             </h3>
             <p className="text-sm leading-relaxed text-gray-800">
               당신에게는 <span className="font-bold text-red-700">20번의 행동력(AP)</span>만 주어집니다.<br/>

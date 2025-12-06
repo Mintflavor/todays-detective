@@ -28,7 +28,7 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
         {/* Header */}
         <div className="text-center border-b border-gray-700/50 pb-6">
           <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">Investigation Report</h2>
-          <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {new Date().getTime().toString().slice(-6)}</p>
+          <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">

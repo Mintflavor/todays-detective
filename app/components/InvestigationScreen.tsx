@@ -185,7 +185,7 @@ export default function InvestigationScreen({
             >
               <div className="flex flex-col items-center gap-1.5">
                 <Notebook size={20} className={currentSuspectId === 0 ? "text-gray-300" : ""} />
-                <span className="text-xs truncate max-w-full">나(Memo)</span>
+                <span className="text-xs truncate max-w-full">나</span>
               </div>
               {currentSuspectId === 0 && <div className="absolute top-0 left-0 w-full h-0.5 bg-gray-500"></div>}
             </button>

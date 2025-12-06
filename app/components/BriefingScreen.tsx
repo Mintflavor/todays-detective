@@ -20,7 +20,7 @@ export default function BriefingScreen({ caseData, onStartInvestigation }: Brief
           className="object-cover"
           priority
         />
-        <div className="absolute inset-0 bg-gray-900/60" />
+        <div className="absolute inset-0 bg-gray-900/80" />
       </div>
 
       <div className="max-w-2xl mx-auto bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform md:rotate-1 mt-4 mb-8 z-10">

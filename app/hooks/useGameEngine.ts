@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent, useCallback } from 'react';
 import { CaseData, ChatLogs, DeductionInput, Evaluation, GamePhase, LoadingType, ChatMessage } from '../types/game';
 import { getRandomPlaceholder, formatTime } from '../lib/utils';
+import { saveScenario } from '../lib/api';
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
 import { generateSuspectPrompt } from '../lib/prompts'; // Import directly for use in send message
@@ -127,7 +128,12 @@ export default function useGameEngine() {
     const fetchCase = async () => {
       try {
         const data = await generateCase();
-        setPreloadedData(data); 
+        // Generate random Case ID
+        data.caseNumber = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        setPreloadedData(data);
+        // Automatically save generated scenario to backend
+        saveScenario(data).catch(err => console.error("Failed to auto-save scenario:", err));
       } catch (err) {
         console.error("Background Fetch Error:", err);
       }
@@ -241,7 +247,8 @@ export default function useGameEngine() {
         ...evaluationResult,
         isCorrect: chosenSuspect.isCulprit, 
         culpritName: chosenSuspect.name, // Ensure this is the chosen suspect's name
-        timeTaken: timeTakenStr 
+        timeTaken: timeTakenStr,
+        caseNumber: caseData.caseNumber 
       });
       setPhase('resolution');
     } catch (err) {
@@ -254,6 +261,14 @@ export default function useGameEngine() {
   const resetGame = useCallback(() => {
     window.location.reload();
   }, []);
+
+  const goToLoadMenu = useCallback(() => {
+    setPhase('load_menu');
+  }, []);
+
+  const handleLoadGame = useCallback((data: CaseData) => {
+    finalizeGameStart(data);
+  }, [finalizeGameStart]);
 
   const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setUserInput(e.target.value);
@@ -297,5 +312,7 @@ export default function useGameEngine() {
     handleInputChange,
     handleKeyDown,
     finalizeGameStart, // Export for use in page.tsx for preloaded data handling
+    goToLoadMenu,
+    handleLoadGame,
   };
 }
