@@ -131,6 +131,9 @@ export default function useGameEngine() {
         // Generate random Case ID
         data.caseNumber = Math.floor(100000 + Math.random() * 900000).toString();
         
+        // Shuffle suspects to prevent predictable culprit position
+        data.suspects.sort(() => Math.random() - 0.5);
+        
         setPreloadedData(data);
         // Automatically save generated scenario to backend
         saveScenario(data).catch(err => console.error("Failed to auto-save scenario:", err));

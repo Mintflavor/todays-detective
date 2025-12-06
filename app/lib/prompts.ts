@@ -48,7 +48,7 @@ export const CASE_GENERATION_PROMPT = `
       "role": "직업 또는 관계",
       "personality": "성격 묘사",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심 살만한 행동)",
-      "isCulprit": false,
+      "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "timeline_truth에 따른 실제 행적",
       "alibi_claim": "탐정에게 주장할 알리바이"
     },
@@ -58,9 +58,9 @@ export const CASE_GENERATION_PROMPT = `
       "role": "직업/관계",
       "personality": "...",
       "secret": "...",
-      "isCulprit": true,
-      "motive": "범행 동기",
-      "trick": "world_setting과 evidence_list를 활용한 구체적이고 논리적인 트릭 (예: 물리적 트릭(숨겨진 장치), 심리적 트릭(착각 유도), 알리바이 트릭(시간 조작, 녹음된 소리 이용) 등 창의적으로)",
+      // 범인일 경우 motive와 trick 필드가 추가되어야 합니다.
+      // "motive": "범행 동기",
+      // "trick": "world_setting과 evidence_list를 활용한 구체적이고 논리적인 트릭",
       "real_action": "실제 범행 행동",
       "alibi_claim": "거짓 알리바이"
     },
@@ -70,7 +70,7 @@ export const CASE_GENERATION_PROMPT = `
       "role": "직업/관계",
       "personality": "...",
       "secret": "...",
-      "isCulprit": false,
+      "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "...",
       "alibi_claim": "..."
     }
