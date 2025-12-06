@@ -105,9 +105,9 @@ export default function InvestigationScreen({
 
       {/* Top Bar */}
       <header className="bg-gray-900/95 backdrop-blur-sm p-3 border-b border-gray-800 shadow-md flex justify-between items-center z-20 shrink-0">
-        <div className="flex flex-col">
-          <h2 className="font-serif font-bold text-amber-600 text-base truncate max-w-[150px]">{caseData.title}</h2>
-          <button onClick={onGoToBriefing} className="text-[10px] text-gray-500 hover:text-gray-300 underline text-left">서류 다시보기</button>
+        <div className="flex flex-col min-w-0">
+          <h2 className="font-serif font-bold text-amber-600 text-base text-left">{caseData.title}</h2>
+          <button onClick={onGoToBriefing} className="text-[10px] text-gray-500 hover:text-gray-300 underline text-left shrink-0">서류 다시보기</button>
         </div>
         
         <div className="flex items-center gap-3">
