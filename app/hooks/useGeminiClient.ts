@@ -93,7 +93,7 @@ export default function useGeminiClient(): UseGeminiClientReturn {
       const evalResult = await callGemini(evalPrompt);
       
       const grade = evalResult.match(/[\[]GRADE[^\]]*[\]]\s*(.*)/)?.[1] || "F";
-      const report = evalResult.match(/[\[]REPORT[^\]]*[\]]\s*([\s\S]*?)(?=[\[]ADVICE[^\]]*[\]]|$)?/)?.[1]?.trim() || "보고서 생성 실패";
+      const report = evalResult.match(/[\[]REPORT[^\]]*[\]]\s*([\s\S]*?)(?=[\[]ADVICE[^\]]*[\]]|$)/)?.[1]?.trim() || "보고서 생성 실패";
       const advice = evalResult.match(/[\[]ADVICE[^\]]*[\]]\s*([\s\S]*)/)?.[1]?.trim() || "조언을 불러올 수 없습니다.";
 
       return {
