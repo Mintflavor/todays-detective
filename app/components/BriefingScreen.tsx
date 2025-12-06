@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { ShieldAlert, FileText, Skull, Microscope, User, Send } from 'lucide-react';
 import { CaseData } from '../types/game';
 
@@ -9,11 +10,20 @@ interface BriefingScreenProps {
 
 export default function BriefingScreen({ caseData, onStartInvestigation }: BriefingScreenProps) {
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-900 p-4 font-serif overflow-y-auto">
-      <div className="max-w-2xl mx-auto bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform md:rotate-1 mt-4 mb-8">
-        <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-multiply" 
-             style={{backgroundImage: 'url("https://www.transparenttextures.com/patterns/aged-paper.png")'}}></div>
-        
+    <div className="min-h-screen bg-gray-900 text-gray-900 p-4 font-serif overflow-y-auto relative">
+      {/* Main Background */}
+      <div className="fixed inset-0 z-0">
+        <Image
+          src="/images/confidential_background.webp"
+          alt="Confidential Background"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gray-900/60" />
+      </div>
+
+      <div className="max-w-2xl mx-auto bg-[#eaddcf] rounded-sm shadow-2xl min-h-[90%] relative transform md:rotate-1 mt-4 mb-8 z-10">
         <div className="p-8 relative z-10">
           <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
             <div>

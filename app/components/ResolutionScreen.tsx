@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 import { FileText, User, ShieldAlert, RefreshCw } from 'lucide-react';
 import { Evaluation } from '../types/game';
 
@@ -10,16 +11,24 @@ interface ResolutionScreenProps {
 export default function ResolutionScreen({ evaluation, onReset }: ResolutionScreenProps) {
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6 font-serif overflow-y-auto relative">
-      {/* Background Texture (Dark Desk) */}
-      <div className="absolute inset-0 opacity-40 pointer-events-none" 
-            style={{backgroundImage: 'radial-gradient(#222 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
+      {/* Background Texture */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/images/papers_background.webp"
+          alt="Resolution Background"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gray-900/60" />
+      </div>
 
       <div className="w-full max-w-4xl mx-auto space-y-8 animate-fade-in-up pb-10 mt-6 relative z-10">
         
         {/* Header */}
-        <div className="text-center border-b border-gray-700 pb-6">
-          <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase">Investigation Report</h2>
-          <p className="text-gray-500 text-[10px] mt-2 font-mono">CASE ID: {new Date().getTime().toString().slice(-6)}</p>
+        <div className="text-center border-b border-gray-700/50 pb-6">
+          <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">Investigation Report</h2>
+          <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {new Date().getTime().toString().slice(-6)}</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">

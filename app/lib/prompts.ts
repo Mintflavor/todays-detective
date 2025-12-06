@@ -17,8 +17,8 @@ export const CASE_GENERATION_PROMPT = `
   "crime_type": "범죄 유형 (예: 살인, 절도, 납치, 방화)",
   
   "world_setting": {
-    "location": "사건 현장의 구체적 구조 (예: 2층 저택. 1층 거실/주방, 2층 서재/침실. 서재는 복도 끝)",
-    "weather": "날씨와 분위기 (예: 폭우로 인한 고립, 천둥소리)"
+    "location": "사건 현장의 구체적 구조 (예: 2층 저택. 1층 거실/주방, 2층 서재/침실. 서재는 복도 끝, 산속 별장, 도심의 고급 아파트, 달리는 기차 안)",
+    "weather": "날씨와 분위기 (예: 폭우로 인한 고립, 맑고 화창한 오후, 안개가 자욱한 새벽, 눈보라 치는 겨울 밤, 별이 총총한 고요한 밤 등 다채롭게 설정)"
   },
 
   "victim_info": {
@@ -60,7 +60,7 @@ export const CASE_GENERATION_PROMPT = `
       "secret": "...",
       "isCulprit": true,
       "motive": "범행 동기",
-      "trick": "world_setting과 evidence_list를 활용한 트릭",
+      "trick": "world_setting과 evidence_list를 활용한 구체적이고 논리적인 트릭 (예: 물리적 트릭(숨겨진 장치), 심리적 트릭(착각 유도), 알리바이 트릭(시간 조작, 녹음된 소리 이용) 등 창의적으로)",
       "real_action": "실제 범행 행동",
       "alibi_claim": "거짓 알리바이"
     },

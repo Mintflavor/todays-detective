@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent, useCallback } from 'react';
-import { CaseData, ChatLogs, DeductionInput, Evaluation, GamePhase, LoadingType } from '../types/game';
+import { CaseData, ChatLogs, DeductionInput, Evaluation, GamePhase, LoadingType, ChatMessage } from '../types/game';
 import { getRandomPlaceholder, formatTime } from '../lib/utils';
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';

@@ -8,7 +8,14 @@ export const callGemini = async (prompt: string): Promise<string> => {
   });
 
   const data = await response.json();
-  if (data.error) throw new Error(data.error);
+  
+  if (data.error) {
+    const errorMessage = typeof data.error === 'object' 
+      ? (data.error.message || JSON.stringify(data.error)) 
+      : data.error;
+    throw new Error(errorMessage);
+  }
+
   if (!data.candidates?.[0]?.content?.parts?.[0]?.text) throw new Error("Invalid response from AI");
   
   return data.candidates[0].content.parts[0].text;

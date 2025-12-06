@@ -1,4 +1,5 @@
 import React, { ChangeEvent } from 'react';
+import Image from 'next/image';
 import { AlertCircle, User, ChevronLeft } from 'lucide-react';
 import { CaseData, DeductionInput } from '../types/game';
 
@@ -18,8 +19,20 @@ export default function DeductionScreen({
   onBack 
 }: DeductionScreenProps) {
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100 p-6 flex items-center justify-center font-serif overflow-y-auto">
-      <div className="w-full max-w-lg bg-gray-800 rounded-sm p-6 shadow-2xl border border-gray-700 relative my-auto">
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-6 flex items-center justify-center font-serif overflow-y-auto relative">
+      {/* Background Image */}
+      <div className="absolute inset-0 z-0">
+        <Image
+          src="/images/papers_background.webp"
+          alt="Papers Background"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gray-900/70" />
+      </div>
+
+      <div className="w-full max-w-lg bg-gray-800 rounded-sm p-6 shadow-2xl border border-gray-700 relative my-auto z-10">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-900 via-red-600 to-red-900"></div>
         
         <div className="text-center mb-6">
