@@ -4,16 +4,16 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: "/server/scenarios/",
-        destination: "https://mintflavor.ddns.net:8001/scenarios/",
+        source: '/api/:path*',
+        destination: 'https://mintflavor.ddns.net:8001/scenarios/:path*', // Proxy to Backend
       },
       {
-        source: "/server/scenarios/:id",
-        destination: "https://mintflavor.ddns.net:8001/scenarios/:id",
+        source: '/server/scenarios/:path*',
+        destination: 'https://mintflavor.ddns.net:8001/scenarios/:path*', // Proxy to Backend
       },
       {
-        source: "/server/:path*",
-        destination: "https://mintflavor.ddns.net:8001/:path*",
+        source: '/server/:path*',
+        destination: 'https://mintflavor.ddns.net:8001/:path*', // Proxy to Backend
       },
     ];
   },

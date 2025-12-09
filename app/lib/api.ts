@@ -48,3 +48,4 @@ export async function getScenarioDetail(id: string): Promise<CaseData> {
   const data = await response.json();
   return data.case_data;
 }
+
