@@ -15,7 +15,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      {/* 은자모바탕 변수 제거됨 */}
       <body className="font-serif bg-gray-950 text-gray-100 antialiased">
         <AssetPreloader />
         {children}

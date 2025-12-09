@@ -2,6 +2,8 @@
   "name": "todays-detective",
   "version": "0.1.0",
   "private": true,
+  "author": "Hyunil Park <hamer1009@gmail.com>",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

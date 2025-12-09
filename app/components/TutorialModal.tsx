@@ -38,6 +38,13 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
           </div>
 
           <div className="bg-black/5 p-4 rounded border border-black/10">
+            <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">중요 안내</h3>
+            <p className="text-sm leading-relaxed text-gray-800">
+              이 게임의 이미지, 시나리오, 등장인물들은 모두 AI로 생성된 허구이며 현실 세계와 무관합니다.
+            </p>
+          </div>
+
+          <div className="bg-black/5 p-4 rounded border border-black/10">
             <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">Interrogation Tip</h3>
             <div className="space-y-2 text-sm">
               <div className="flex gap-2 text-red-700/70">
