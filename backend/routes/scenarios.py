@@ -44,3 +44,17 @@ async def get_scenario(id: str):
         raise HTTPException(status_code=404, detail="Scenario not found")
         
     return fix_id(scenario)
+
+@router.delete("/{id}")
+async def delete_scenario(id: str):
+    try:
+        oid = ObjectId(id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    result = await scenario_collection.delete_one({"_id": oid})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+
+    return {"message": "Scenario deleted successfully"}
+
