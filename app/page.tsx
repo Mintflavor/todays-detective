@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useState } from 'react';
 import useGameEngine from './hooks/useGameEngine';
 import IntroScreen from './components/IntroScreen';
 import LoadScenarioScreen from './components/LoadScenarioScreen';
@@ -11,6 +11,8 @@ import InvestigationScreen from './components/InvestigationScreen';
 import DeductionScreen from './components/DeductionScreen';
 import ResolutionScreen from './components/ResolutionScreen';
 import ErrorModal from './components/ErrorModal';
+import AdminScreen from './components/AdminScreen';
+import { useSecretCommand } from './hooks/useSecretCommand';
 
 export default function TodaysDetective() {
   const {
@@ -44,6 +46,22 @@ export default function TodaysDetective() {
     goToLoadMenu,
     handleLoadGame,
   } = useGameEngine();
+
+  const [isAdminMode, setIsAdminMode] = useState(false);
+
+  useSecretCommand({
+    onTrigger: () => {
+      if (phase === 'intro') {
+        setIsAdminMode(true);
+        setErrorMsg(null);
+      }
+    },
+    enabled: phase === 'intro',
+  });
+
+  if (isAdminMode) {
+    return <AdminScreen onExit={() => setIsAdminMode(false)} />;
+  }
 
   return (
     <>

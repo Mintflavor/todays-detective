@@ -49,3 +49,13 @@ export async function getScenarioDetail(id: string): Promise<CaseData> {
   return data.case_data;
 }
 
+export async function deleteScenario(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/scenarios/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to delete scenario: ${response.statusText}`);
+  }
+}
+
