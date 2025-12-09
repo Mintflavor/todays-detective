@@ -2,7 +2,7 @@ import { Suspect, WorldSetting, CaseData } from '../types/game';
 
 export const CASE_GENERATION_PROMPT = `
 당신은 하드보일드 미스터리 소설의 거장입니다.
-플레이어(탐정)가 해결해야 할 단편 추리 시나리오를 JSON 포맷으로 생성하세요.
+탐정(플레이어)이 해결해야 할 단편 추리 시나리오를 JSON 포맷으로 생성하세요.
 
 [핵심 요구사항]
 1. 사실의 일관성: 모든 용의자는 동일한 시공간에 존재했습니다. 공간 구조, 시간의 흐름, 시신의 상태는 절대적으로 일치해야 합니다.
