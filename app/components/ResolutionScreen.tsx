@@ -111,7 +111,7 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
             onClick={onReset}
             className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-12 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
           >
-            <RefreshCw size={20} /> Close Case & Start New
+            <RefreshCw size={20} /> 새로운 사건 맡기
           </button>
         </div>
 
