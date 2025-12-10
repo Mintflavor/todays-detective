@@ -1,6 +1,6 @@
 import { CaseData } from "@/app/types/game";
 
-const API_BASE_URL = "/server";
+const API_BASE_URL = "https://mintflavor.ddns.net:8001";
 
 export interface ScenarioListItem {
   _id: string;
