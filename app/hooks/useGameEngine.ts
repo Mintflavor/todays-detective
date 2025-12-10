@@ -286,7 +286,7 @@ export default function useGameEngine() {
     inputPlaceholder,
     deductionInput, setDeductionInput,
     isMuted, toggleMute,
-    showTimeOverModal, closeTimeOverModal,
+    showTimeOverModal, closeTimeOverModal, triggerTimeOver: () => setShowTimeOverModal(true),
     errorMsg, setErrorMsg,
     retryAction,
     audioRef,

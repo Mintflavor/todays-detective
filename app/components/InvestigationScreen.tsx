@@ -71,32 +71,39 @@ export default function InvestigationScreen({
 
       {/* Time Over Modal Overlay */}
       {showTimeOverModal && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-6 animate-fade-in">
-            <div className="w-full max-w-md bg-[#dfd3c3] text-gray-900 rounded-sm shadow-2xl overflow-hidden border-4 border-double border-red-900">
-              <div className="bg-red-900 text-red-100 p-3 flex items-center gap-2">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-6 animate-fade-in">
+            <div className="w-full max-w-md bg-[#f0e6d2] text-gray-900 rounded-sm shadow-2xl overflow-hidden relative md:rotate-1">
+              <div className="bg-red-900 text-red-100 p-4 border-b-4 border-red-800 flex items-center gap-2">
                 <AlertTriangle size={20} />
-                <h2 className="font-serif font-bold text-lg tracking-wider uppercase">URGENT TELEGRAM</h2>
+                <h2 className="font-serif font-bold text-xl tracking-wider uppercase">긴급 타전</h2>
               </div>
-              <div className="p-6 font-mono text-sm leading-relaxed text-gray-800 space-y-4">
-                <p>
-                  <span className="font-bold">TO:</span> DETECTIVE<br/>
-                  <span className="font-bold">FROM:</span> HEADQUARTERS
-                </p>
-                <div className="border-t border-b border-gray-400 py-4 my-2 uppercase font-bold text-center tracking-widest text-red-800">
-                  -- STOP -- <br/>
-                  GOLDEN TIME EXPIRED. <br/>
-                  -- STOP --
+
+              <div className="p-6 space-y-6 font-serif">
+                <div>
+                  <h3 className="font-bold text-red-900 flex items-center gap-2 mb-2">
+                    <Clock size={18} /> 골든 타임 종료
+                  </h3>
+                  <p className="text-sm leading-relaxed text-gray-800">
+                    <span className="font-bold border-b border-black">제한 시간(10분)</span>이 모두 경과했습니다.<br/>
+                    현장에 경찰 병력이 도착하여 현장을 통제하기 시작했습니다.
+                  </p>
                 </div>
-                <p>
-                  POLICE FORCE ARRIVED. INVESTIGATION CONTINUES BUT MAX GRADE CAPPED AT 'B'.
-                </p>
+
+                <div className="bg-red-900/10 p-4 rounded border border-red-900/20">
+                  <h3 className="font-bold text-red-800 text-xs uppercase tracking-widest mb-2">본부 지침 (Penalty)</h3>
+                  <p className="text-sm leading-relaxed text-gray-900">
+                    수사는 계속 진행할 수 있으나,<br/>
+                    최종 평가 등급은 <span className="font-bold text-red-700 underline">최대 'B'등급</span>으로 제한됩니다.
+                  </p>
+                </div>
               </div>
-              <div className="p-4 bg-[#cfc3b3]">
+
+              <div className="p-4 bg-[#e6dbc5] border-t border-[#d6cbb5]">
                 <button 
                   onClick={closeTimeOverModal}
-                  className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-sm uppercase tracking-wider"
+                  className="w-full bg-gray-800 hover:bg-gray-700 text-white font-bold py-3 rounded-sm shadow-md uppercase tracking-wider transition-colors flex items-center justify-center gap-2"
                 >
-                  Acknowledge
+                  수신 확인
                 </button>
               </div>
             </div>

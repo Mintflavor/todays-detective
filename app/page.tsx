@@ -30,7 +30,7 @@ export default function TodaysDetective() {
     inputPlaceholder,
     deductionInput, setDeductionInput,
     isMuted, toggleMute,
-    showTimeOverModal, closeTimeOverModal,
+    showTimeOverModal, closeTimeOverModal, triggerTimeOver,
     errorMsg, setErrorMsg,
     retryAction,
     audioRef,
