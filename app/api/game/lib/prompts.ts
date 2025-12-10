@@ -1,4 +1,4 @@
-import { Suspect, WorldSetting, CaseData } from '../types/game';
+import { Suspect, WorldSetting, CaseData } from '@/app/types/game';
 
 export const CASE_GENERATION_PROMPT = `
 당신은 하드보일드 미스터리 소설의 거장입니다.
