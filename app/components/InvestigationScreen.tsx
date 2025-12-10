@@ -49,11 +49,21 @@ export default function InvestigationScreen({
 }: InvestigationScreenProps) {
   
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const currentSuspect = caseData.suspects.find(s => s.id === currentSuspectId);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatLogs, currentSuspectId, isTyping]);
+
+  // Auto-focus input when typing finishes or suspect changes
+  useEffect(() => {
+    if (!isTyping && actionPoints > 0) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
+    }
+  }, [isTyping, currentSuspectId, actionPoints]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-950 text-gray-100 font-sans overflow-hidden relative">
@@ -220,11 +230,12 @@ export default function InvestigationScreen({
           {/* Input Area */}
           <div className="p-3 pb-6 flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={userInput}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder={inputPlaceholder}
+              placeholder={actionPoints <= 0 && currentSuspectId !== 0 ? "행동력이 소진되어 더 이상 심문할 수 없습니다." : inputPlaceholder}
               disabled={currentSuspectId !== 0 && (actionPoints <= 0 || isTyping)}
               className="flex-1 bg-gray-950/50 border border-gray-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-amber-700 placeholder-gray-600 font-sans text-sm transition-all backdrop-blur-sm"
             />
