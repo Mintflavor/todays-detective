@@ -4,7 +4,7 @@ import { CASE_GENERATION_PROMPT } from '../lib/prompts';
 import { CaseData } from '@/app/types/game';
 
 // Python Backend URL (Adjust if your backend is running elsewhere)
-const PYTHON_BACKEND_URL = 'https://mintflavor.ddns.net:8001'; // Or use process.env.BACKEND_URL
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export async function POST() {
   try {
