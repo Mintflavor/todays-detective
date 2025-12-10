@@ -38,7 +38,7 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
           </div>
 
           <div className="bg-black/5 p-4 rounded border border-black/10">
-            <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">Interrogation Tip</h3>
+            <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">질문 팁</h3>
             <div className="space-y-2 text-sm">
               <div className="flex gap-2 text-red-700/70">
                 <X size={16} /> "너 범인이야?" (단순 부정만)

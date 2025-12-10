@@ -3,7 +3,7 @@ import { callGemini } from '../lib/gemini';
 import { generateSuspectPrompt } from '../lib/prompts';
 import { CaseData } from '@/app/types/game';
 
-const PYTHON_BACKEND_URL = 'https://mintflavor.ddns.net:8001'; 
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; 
 
 export async function POST(req: Request) {
   try {
