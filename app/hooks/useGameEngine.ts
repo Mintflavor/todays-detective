@@ -135,8 +135,8 @@ export default function useGameEngine() {
         data.suspects.sort(() => Math.random() - 0.5);
         
         setPreloadedData(data);
-        // Automatically save generated scenario to backend
-        saveScenario(data).catch(err => console.error("Failed to auto-save scenario:", err));
+        // Automatically save generated scenario to backend - REMOVED: Already saved in generateCase (server-side)
+        // saveScenario(data).catch(err => console.error("Failed to auto-save scenario:", err));
       } catch (err) {
         console.error("Background Fetch Error:", err);
       }
@@ -155,7 +155,7 @@ export default function useGameEngine() {
   }, [preloadedData, finalizeGameStart]);
 
   const handleSendMessage = useCallback(async () => {
-    if (!userInput.trim() || isTyping || !caseData) return;
+    if (!userInput.trim() || isTyping || !caseData || !caseData.scenarioId) return;
     
     // Note tab logic
     if (currentSuspectId === 0) {
@@ -186,16 +186,8 @@ export default function useGameEngine() {
       ).join('\n');
       
       const reply = await interrogateSuspect(
+        caseData.scenarioId,
         suspect.id,
-        suspect.name,
-        suspect.role,
-        suspect.personality,
-        suspect.secret,
-        suspect.real_action || '', 
-        suspect.alibi_claim || '', 
-        caseData.world_setting.location,
-        caseData.world_setting.weather,
-        caseData.timeline_truth,
         history,
         userMsg
       );
@@ -222,7 +214,7 @@ export default function useGameEngine() {
 
 
   const submitDeduction = useCallback(async () => {
-    if (!caseData || !deductionInput.culpritId) return;
+    if (!caseData || !deductionInput.culpritId || !caseData.scenarioId) return;
 
     setLoadingType('deduction'); 
     setLoadingText("최종 추리 보고서 작성 중..."); 
@@ -231,13 +223,9 @@ export default function useGameEngine() {
     const chosenSuspect = caseData.suspects.find(s => s.id === deductionInput.culpritId);
     if (!chosenSuspect) return;
 
-    const culprit = caseData.suspects.find(s => s.isCulprit); 
-    if (!culprit) return; 
-
     try {
       const evaluationResult = await evaluateDeduction(
-        caseData.solution,
-        culprit.name,
+        caseData.scenarioId,
         chosenSuspect.name,
         deductionInput.reasoning,
         isOverTime
@@ -248,8 +236,6 @@ export default function useGameEngine() {
 
       setEvaluation({
         ...evaluationResult,
-        isCorrect: chosenSuspect.isCulprit, 
-        culpritName: chosenSuspect.name, // Ensure this is the chosen suspect's name
         timeTaken: timeTakenStr,
         caseNumber: caseData.caseNumber 
       });
@@ -300,7 +286,7 @@ export default function useGameEngine() {
     inputPlaceholder,
     deductionInput, setDeductionInput,
     isMuted, toggleMute,
-    showTimeOverModal, closeTimeOverModal,
+    showTimeOverModal, closeTimeOverModal, triggerTimeOver: () => setShowTimeOverModal(true),
     errorMsg, setErrorMsg,
     retryAction,
     audioRef,

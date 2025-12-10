@@ -38,6 +38,7 @@ export interface CaseData {
   evidence_list: Evidence[];
   suspects: Suspect[];
   solution: string;
+  scenarioId?: string; // Add scenarioId
   caseNumber?: string;
 }
 

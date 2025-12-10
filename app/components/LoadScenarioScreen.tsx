@@ -35,7 +35,9 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
     setLoading(true);
     try {
       const caseData = await getScenarioDetail(id);
-      onLoad(caseData);
+      // Inject the scenarioId so the game engine can use it
+      const caseDataWithId = { ...caseData, scenarioId: id };
+      onLoad(caseDataWithId);
     } catch (err) {
       setError("사건 파일을 여는 데 실패했습니다.");
       setLoading(false);

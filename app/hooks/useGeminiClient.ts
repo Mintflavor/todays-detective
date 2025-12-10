@@ -9,8 +9,8 @@ interface UseGeminiClientReturn {
   retryAction: (() => void) | null;
   setRetryAction: (action: (() => void) | null) => void;
   generateCase: () => Promise<CaseData>;
-  interrogateSuspect: (suspectId: number, currentSuspectName: string, suspectRole: string, currentSuspectPersonality: string, currentSuspectSecret: string, currentSuspectRealAction: string, currentSuspectAlibiClaim: string, caseWorldSettingLocation: string, caseWorldSettingWeather: string, caseTimelineTruth: string[], history: string, userMsg: string) => Promise<string>;
-  evaluateDeduction: (truth: string, culpritName: string, chosenSuspectName: string, reasoning: string, isOverTime: boolean) => Promise<Evaluation>;
+  interrogateSuspect: (scenarioId: string, suspectId: number, history: string, userMsg: string) => Promise<string>;
+  evaluateDeduction: (scenarioId: string, culpritName: string, reasoning: string, isOverTime: boolean) => Promise<Evaluation>;
 }
 
 export default function useGeminiClient(): UseGeminiClientReturn {
@@ -36,10 +36,21 @@ export default function useGeminiClient(): UseGeminiClientReturn {
 
   const generateCase = async (): Promise<CaseData> => {
     return withErrorHandling(async () => {
-      const resultText = await callGemini(CASE_GENERATION_PROMPT);
-      const data = JSON.parse(resultText.replace(/```json/g, '').replace(/```/g, '').trim());
-      if (data && data.suspects) {
-        return data as CaseData;
+      const response = await fetch('/api/game/start', {
+        method: 'POST',
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate case");
+      }
+
+      if (data && data.caseData) {
+        // Attach scenarioId to caseData
+        return {
+          ...data.caseData,
+          scenarioId: data.scenarioId
+        } as CaseData;
       } else {
         throw new Error("Invalid Case Data Structure");
       }
@@ -47,65 +58,69 @@ export default function useGeminiClient(): UseGeminiClientReturn {
   };
 
   const interrogateSuspect = async (
+    scenarioId: string,
     suspectId: number,
-    currentSuspectName: string,
-    suspectRole: string,
-    currentSuspectPersonality: string,
-    currentSuspectSecret: string,
-    currentSuspectRealAction: string,
-    currentSuspectAlibiClaim: string,
-    caseWorldSettingLocation: string,
-    caseWorldSettingWeather: string,
-    caseTimelineTruth: string[],
     history: string,
     userMsg: string
   ): Promise<string> => {
     return withErrorHandling(async () => {
-      const suspectData = {
-        id: suspectId,
-        name: currentSuspectName,
-        role: suspectRole,
-        personality: currentSuspectPersonality,
-        secret: currentSuspectSecret,
-        isCulprit: false, // This is temporary, the prompt itself handles if they are culprit or not.
-        real_action: currentSuspectRealAction,
-        alibi_claim: currentSuspectAlibiClaim,
-      };
-      const worldSetting = {
-        location: caseWorldSettingLocation,
-        weather: caseWorldSettingWeather,
-      };
-      const systemPrompt = generateSuspectPrompt(suspectData, worldSetting, caseTimelineTruth);
-      const fullPrompt = `${systemPrompt}\n\n[이전 대화]\n${history}\n\n탐정: ${userMsg}\n용의자:`
-      return await callGemini(fullPrompt);
-    }, "용의자와의 통신이 불안정합니다. 다시 시도해주세요.", () => interrogateSuspect(suspectId, currentSuspectName, suspectRole, currentSuspectPersonality, currentSuspectSecret, currentSuspectRealAction, currentSuspectAlibiClaim, caseWorldSettingLocation, caseWorldSettingWeather, caseTimelineTruth, history, userMsg));
+      const response = await fetch('/api/game/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarioId,
+          suspectId,
+          message: userMsg,
+          history
+        }),
+      });
+      
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to interrogate suspect");
+      }
+
+      return data.reply;
+    }, "용의자와의 통신이 불안정합니다. 다시 시도해주세요.", () => interrogateSuspect(scenarioId, suspectId, history, userMsg));
   };
 
   const evaluateDeduction = async (
-    truth: string,
-    culpritName: string,
-    chosenSuspectName: string,
+    scenarioId: string,
+    culpritName: string, // Player's choice
     reasoning: string,
     isOverTime: boolean
   ): Promise<Evaluation> => {
     return withErrorHandling(async () => {
-      const evalPrompt = generateEvaluationPrompt(truth, culpritName, chosenSuspectName, reasoning, isOverTime);
-      const evalResult = await callGemini(evalPrompt);
-      
-      const grade = evalResult.match(/[\[]GRADE[^\]]*[\]]\s*(.*)/)?.[1] || "F";
-      const report = evalResult.match(/[\[]REPORT[^\]]*[\]]\s*([\s\S]*?)(?=[\[]ADVICE[^\]]*[\]]|$)/)?.[1]?.trim() || "보고서 생성 실패";
-      const advice = evalResult.match(/[\[]ADVICE[^\]]*[\]]\s*([\s\S]*)/)?.[1]?.trim() || "조언을 불러올 수 없습니다.";
+      const response = await fetch('/api/game/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scenarioId,
+          deductionData: {
+            culpritName,
+            reasoning,
+            isOverTime
+          }
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to evaluate deduction");
+      }
 
       return {
-        isCorrect: (culpritName === chosenSuspectName),
-        report,
-        advice,
-        grade,
-        truth: truth, // This will be filled later, currently passing true as a placeholder.
-        culpritName: chosenSuspectName, // This will be filled later.
-        timeTaken: "" // This will be filled later.
+        isCorrect: data.isCorrect,
+        report: data.report,
+        advice: data.advice,
+        grade: data.grade,
+        truth: data.truth,
+        culpritName: data.culpritName,
+        timeTaken: "" 
       };
-    }, "추리 평가 중 오류가 발생했습니다.", () => evaluateDeduction(truth, culpritName, chosenSuspectName, reasoning, isOverTime));
+    }, "추리 평가 중 오류가 발생했습니다.", () => evaluateDeduction(scenarioId, culpritName, reasoning, isOverTime));
   };
 
   return {

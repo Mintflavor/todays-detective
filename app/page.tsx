@@ -12,6 +12,7 @@ import DeductionScreen from './components/DeductionScreen';
 import ResolutionScreen from './components/ResolutionScreen';
 import ErrorModal from './components/ErrorModal';
 import AdminScreen from './components/AdminScreen';
+import AdminAuthModal from './components/AdminAuthModal';
 import { useSecretCommand } from './hooks/useSecretCommand';
 
 export default function TodaysDetective() {
@@ -29,7 +30,7 @@ export default function TodaysDetective() {
     inputPlaceholder,
     deductionInput, setDeductionInput,
     isMuted, toggleMute,
-    showTimeOverModal, closeTimeOverModal,
+    showTimeOverModal, closeTimeOverModal, triggerTimeOver,
     errorMsg, setErrorMsg,
     retryAction,
     audioRef,
@@ -48,11 +49,12 @@ export default function TodaysDetective() {
   } = useGameEngine();
 
   const [isAdminMode, setIsAdminMode] = useState(false);
+  const [showAdminAuth, setShowAdminAuth] = useState(false);
 
   useSecretCommand({
     onTrigger: () => {
       if (phase === 'intro') {
-        setIsAdminMode(true);
+        setShowAdminAuth(true);
         setErrorMsg(null);
       }
     },
@@ -65,6 +67,16 @@ export default function TodaysDetective() {
 
   return (
     <>
+      {showAdminAuth && (
+        <AdminAuthModal 
+          onSuccess={() => {
+            setShowAdminAuth(false);
+            setIsAdminMode(true);
+          }}
+          onCancel={() => setShowAdminAuth(false)}
+        />
+      )}
+
       {/* Common Error Modal */}
       <ErrorModal 
         errorMsg={errorMsg} 
