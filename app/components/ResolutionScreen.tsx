@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw } from 'lucide-react';
+import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import { Evaluation } from '../types/game';
 
 interface ResolutionScreenProps {
@@ -9,6 +9,8 @@ interface ResolutionScreenProps {
 }
 
 export default function ResolutionScreen({ evaluation, onReset }: ResolutionScreenProps) {
+  const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6 font-serif overflow-y-auto relative">
       {/* Background Texture */}
@@ -27,7 +29,7 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
         
         {/* Header */}
         <div className="text-center border-b border-gray-700/50 pb-6">
-          <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">Investigation Report</h2>
+          <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">수사 결과 보고서</h2>
           <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
         </div>
 
@@ -45,19 +47,19 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
               <div className={`absolute inset-0 flex items-center justify-center border-4 border-double m-2 opacity-80 mix-blend-multiply animate-stamp transform rotate-12
                 ${evaluation.isCorrect ? 'border-red-600 text-red-600' : 'border-gray-500 text-gray-500'}`}>
                 <span className="text-3xl font-black uppercase tracking-widest">
-                  {evaluation.isCorrect ? 'ARRESTED' : 'ESCAPED'}
+                  {evaluation.isCorrect ? '검거 성공' : '검거 실패'}
                 </span>
               </div>
             </div>
             
             {/* Caption */}
-            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100">
-              Suspect: {evaluation.culpritName}
+            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100 min-h-[40px]">
+              진범: {showTruth ? evaluation.culpritName : '???'}
             </div>
             <div className="flex justify-between px-2 pt-2 font-mono text-xs text-gray-500">
               <span>{new Date().toLocaleDateString()}</span>
               {/* Time Taken Display */}
-              <span className="font-bold text-gray-700">Time: {evaluation.timeTaken}</span>
+              <span className="font-bold text-gray-700">소요 시간: {evaluation.timeTaken}</span>
             </div>
           </div>
 
@@ -76,32 +78,45 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
               </div>
 
               <h3 className="text-sm font-bold uppercase tracking-widest text-amber-900 mb-4 border-b border-amber-900/20 pb-2">
-                Detective Performance Eval.
+                탐정 수사 능력 평가
               </h3>
               
               <div className="space-y-6 text-sm leading-relaxed">
                 <div>
-                  <h4 className="font-bold text-gray-700 mb-1 border-l-4 border-gray-400 pl-2">SUMMARY</h4>
+                  <h4 className="font-bold text-gray-700 mb-1 border-l-4 border-gray-400 pl-2">종합 평가</h4>
                   <p>{evaluation.report}</p>
                 </div>
                 
                 {/* Missed Clues / Hints Section */}
                 <div>
-                  <h4 className="font-bold text-gray-700 mb-1 border-l-4 border-red-400 pl-2">MISSED CLUES & ADVICE</h4>
+                  <h4 className="font-bold text-gray-700 mb-1 border-l-4 border-red-400 pl-2">조언 및 놓친 단서</h4>
                   <p className="text-gray-700 italic bg-black/5 p-2 rounded">{evaluation.advice}</p>
                 </div>
               </div>
             </div>
 
-            {/* Truth Reveal */}
-            <div className="bg-black/40 border border-gray-700 p-6 rounded-sm backdrop-blur-sm">
-                <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
-                <ShieldAlert size={14} /> The Whole Truth
-              </h3>
-              <p className="text-gray-300 leading-relaxed font-serif text-lg">
-                {evaluation.truth}
-              </p>
-            </div>
+            {/* Truth Reveal Control */}
+            {!evaluation.isCorrect && (
+              <button 
+                onClick={() => setShowTruth(!showTruth)}
+                className="w-full py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 rounded-sm flex items-center justify-center gap-2 transition-all text-sm"
+              >
+                {showTruth ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showTruth ? "사건의 전말 숨기기" : "진범 및 사건의 전말 확인하기"}
+              </button>
+            )}
+
+            {/* Truth Reveal Content */}
+            {showTruth && (
+              <div className="bg-black/40 border border-gray-700 p-6 rounded-sm backdrop-blur-sm animate-fade-in">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-2">
+                  <ShieldAlert size={14} /> 사건의 전말
+                </h3>
+                <p className="text-gray-300 leading-relaxed font-serif text-lg">
+                  {evaluation.truth}
+                </p>
+              </div>
+            )}
 
           </div>
         </div>

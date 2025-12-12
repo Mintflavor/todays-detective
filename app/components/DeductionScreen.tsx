@@ -38,13 +38,13 @@ export default function DeductionScreen({
         <div className="text-center mb-6">
           <AlertCircle className="mx-auto text-red-500 mb-4" size={40} />
           <h2 className="text-2xl font-bold text-white tracking-widest uppercase">
-            Final Deduction
+            최종 수사 보고
           </h2>
-          <p className="text-gray-500 text-[10px] mt-2 uppercase tracking-wide">Select the culprit & Reveal the truth</p>
+          <p className="text-gray-500 text-[10px] mt-2 uppercase tracking-wide">범인을 지목하고 사건의 진실을 밝히세요</p>
         </div>
         
         <div className="mb-6 space-y-4">
-          <label className="block text-gray-400 text-xs font-sans uppercase tracking-wider font-bold">The Culprit</label>
+          <label className="block text-gray-400 text-xs font-sans uppercase tracking-wider font-bold">용의자 지목</label>
           <div className="grid grid-cols-3 gap-2">
             {caseData.suspects.map(s => (
               <button
@@ -60,13 +60,14 @@ export default function DeductionScreen({
                   <User size={24} />
                 </div>
                 <div className="font-bold text-xs truncate">{s.name}</div>
+                <div className="text-[10px] text-gray-400 truncate mt-1">{s.role}</div>
               </button>
             ))}
           </div>
         </div>
 
         <div className="mb-6 space-y-4">
-          <label className="block text-gray-400 text-xs font-sans uppercase tracking-wider font-bold">Motive & Trick</label>
+          <label className="block text-gray-400 text-xs font-sans uppercase tracking-wider font-bold">범행 동기 및 트릭</label>
           <textarea
             value={deductionInput.reasoning}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setDeductionInput(prev => ({ ...prev, reasoning: e.target.value }))}
