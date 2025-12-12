@@ -4,8 +4,6 @@ import { getRandomPlaceholder, formatTime } from '../lib/utils';
 import { saveScenario } from '../lib/api';
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
-import { generateSuspectPrompt } from '../lib/prompts'; // Import directly for use in send message
-
 
 export default function useGameEngine() {
   // --- Game Flow State ---
