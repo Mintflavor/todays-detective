@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff } from 'lucide-react';
-import { Evaluation } from '../types/game';
+import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope } from 'lucide-react';
+import { Evaluation, CaseData } from '../types/game';
 
 interface ResolutionScreenProps {
   evaluation: Evaluation;
+  caseData: CaseData;
   onReset: () => void;
 }
 
-export default function ResolutionScreen({ evaluation, onReset }: ResolutionScreenProps) {
+export default function ResolutionScreen({ evaluation, caseData, onReset }: ResolutionScreenProps) {
   const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
+  const [showBriefing, setShowBriefing] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6 font-serif overflow-y-auto relative">
@@ -104,16 +106,27 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
               </div>
             </div>
 
-            {/* Truth Reveal Control */}
-            {!evaluation.isCorrect && (
+            {/* Actions */}
+            <div className="flex flex-col gap-3">
+              {/* Briefing Button */}
               <button 
-                onClick={() => setShowTruth(!showTruth)}
-                className="w-full py-2 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 rounded-sm flex items-center justify-center gap-2 transition-all text-sm"
+                onClick={() => setShowBriefing(true)}
+                className="w-full py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-amber-500 rounded-sm flex items-center justify-center gap-2 transition-all text-sm font-bold"
               >
-                {showTruth ? <EyeOff size={16} /> : <Eye size={16} />}
-                {showTruth ? "사건의 전말 숨기기" : "진범 및 사건의 전말 확인하기"}
+                <FileText size={16} /> 사건 브리핑 문서 확인
               </button>
-            )}
+
+              {/* Truth Reveal Control */}
+              {!evaluation.isCorrect && (
+                <button 
+                  onClick={() => setShowTruth(!showTruth)}
+                  className="w-full py-3 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 rounded-sm flex items-center justify-center gap-2 transition-all text-sm font-bold"
+                >
+                  {showTruth ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showTruth ? "사건의 전말 숨기기" : "진범 및 사건의 전말 확인하기"}
+                </button>
+              )}
+            </div>
 
             {/* Truth Reveal Content */}
             {showTruth && (
@@ -140,6 +153,113 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
         </div>
 
       </div>
+
+      {/* Briefing Modal */}
+      {showBriefing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-2xl bg-[#eaddcf] text-gray-900 rounded-sm shadow-2xl overflow-hidden relative max-h-[90vh] flex flex-col border border-gray-600">
+            <div className="bg-gray-800 text-gray-200 p-4 flex justify-between items-center shrink-0 border-b border-amber-900/30">
+              <h3 className="font-bold text-lg flex items-center gap-2 font-serif text-amber-500">
+                <FileText size={20} /> 사건 브리핑 문서
+              </h3>
+              <button onClick={() => setShowBriefing(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto font-serif space-y-8 bg-[#eaddcf]">
+              
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                  <FileText size={14} /> 사건 개요
+                </h3>
+                <p className="text-sm leading-relaxed font-medium text-gray-800 border-l-4 border-amber-800/30 pl-4">
+                  {caseData.summary}
+                </p>
+              </section>
+
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                  <Skull size={14} /> 피해자 정보
+                </h3>
+                <div className="bg-black/5 p-4 rounded-sm border border-black/10 text-sm space-y-2">
+                  <div className="flex justify-between border-b border-black/10 pb-1">
+                    <span className="font-bold text-gray-700">이름:</span>
+                    <span>{caseData.victim_info.name}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-black/10 pb-1">
+                    <span className="font-bold text-gray-700">발생 시각:</span>
+                    <span>{caseData.victim_info.incident_time}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-gray-700 block mb-1">피해 내용:</span>
+                    <span className="block pl-2 text-gray-800">{caseData.victim_info.damage_details}</span>
+                  </div>
+                  <div>
+                    <span className="font-bold text-gray-700 block mb-1">현장 상태:</span>
+                    <span className="block pl-2 text-gray-800">{caseData.victim_info.body_condition}</span>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                  <Microscope size={14} /> 초동 증거물
+                </h3>
+                <div className="space-y-2">
+                  {caseData.evidence_list.map((item, idx) => (
+                    <div key={idx} className="bg-white/50 p-3 rounded-sm border border-black/5 flex gap-3 items-start">
+                      <div className="w-1 h-full bg-amber-800 rounded-full shrink-0"></div>
+                      <div>
+                        <div className="font-bold text-sm text-gray-900">{item.name}</div>
+                        <div className="text-xs text-gray-600">{item.description}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-gray-500 mb-3 flex items-center gap-2">
+                  <User size={14} /> 용의자 목록
+                </h3>
+                <div className="grid gap-3">
+                  {caseData.suspects.map(s => (
+                    <div key={s.id} className="flex items-center gap-4 bg-black/5 p-4 rounded-sm border border-black/10">
+                      <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center shrink-0 border border-gray-400 overflow-hidden relative">
+                        {s.portraitImage ? (
+                          <Image 
+                            src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                            alt={s.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <User className="text-gray-600" size={24} />
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold text-base text-gray-900">{s.name}</div>
+                        <div className="text-xs text-gray-600 italic">{s.role} | {s.personality}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+            </div>
+            
+            <div className="p-4 bg-gray-200 border-t border-gray-300 text-center shrink-0">
+              <button 
+                onClick={() => setShowBriefing(false)}
+                className="px-8 py-3 bg-gray-800 text-white rounded-sm font-bold text-sm hover:bg-gray-700 transition-colors uppercase tracking-widest"
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

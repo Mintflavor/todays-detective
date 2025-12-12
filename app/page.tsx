@@ -157,9 +157,10 @@ export default function TodaysDetective() {
         />
       )}
 
-      {phase === 'resolution' && evaluation && (
+      {phase === 'resolution' && evaluation && caseData && (
         <ResolutionScreen 
           evaluation={evaluation}
+          caseData={caseData}
           onReset={resetGame}
         />
       )}
