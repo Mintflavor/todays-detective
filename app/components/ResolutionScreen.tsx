@@ -53,7 +53,7 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
               )}
               
               {/* Stamp Overlay */}
-              <div className={`absolute inset-0 flex items-center justify-center border-4 border-double m-2 opacity-80 mix-blend-multiply animate-stamp transform rotate-12
+              <div className={`absolute inset-0 flex items-center justify-center border-4 border-double m-2 opacity-80 mix-blend-multiply animate-stamp transform rotate-12 rounded-full
                 ${evaluation.isCorrect ? 'border-red-600 text-red-600' : 'border-gray-500 text-gray-500'}`}>
                 <span className="text-3xl font-black uppercase tracking-widest">
                   {evaluation.isCorrect ? '검거 성공' : '검거 실패'}
