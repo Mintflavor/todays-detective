@@ -41,7 +41,16 @@ export default function ResolutionScreen({ evaluation, onReset }: ResolutionScre
             
             {/* Image Area */}
             <div className="bg-gray-200 aspect-square mb-4 flex items-center justify-center relative overflow-hidden">
-              <User size={80} className="text-gray-400" />
+              {(showTruth || evaluation.isCorrect) && evaluation.culpritImage ? (
+                <Image 
+                  src={`data:image/jpeg;base64,${evaluation.culpritImage}`} 
+                  alt="Culprit"
+                  fill
+                  className="object-cover grayscale contrast-125" // Noir style effect
+                />
+              ) : (
+                <User size={80} className="text-gray-400" />
+              )}
               
               {/* Stamp Overlay */}
               <div className={`absolute inset-0 flex items-center justify-center border-4 border-double m-2 opacity-80 mix-blend-multiply animate-stamp transform rotate-12

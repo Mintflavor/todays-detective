@@ -7,7 +7,7 @@
 1.  **빠른 고품질 AI 이미지 생성:** `imagen-4.0-fast-generate-001` 모델을 사용하여 대기 시간을 최소화하면서 고품질 흑백 만화 스타일 초상화를 생성합니다. (해상도: 1024x1024px)
 2.  **정교한 페르소나 반영:** 용의자의 성별, 나이, 직업, 성격을 반영한 프롬프트를 자동 생성하여 캐릭터의 개성을 살립니다.
 3.  **하위 호환성 (Backward Compatibility):** 초상화 데이터가 없는 기존 시나리오에서는 기존의 `<User />` 아이콘을 그대로 표시합니다.
-4.  **최적화된 표시:** 생성은 1K 해상도로 하되, 웹 페이지에서는 256x256px로 축소 표시하여 UI 통일성을 유지합니다.
+4.  **최적화된 표시:** 생성은 1K 해상도로 하되, 웹 페이지에서는 512x512px로 축소 표시하여 UI 통일성을 유지합니다.
 
 ## 3. 기술 스택 및 모델 (Tech Stack & Models)
 *   **Prompt Generation:** Google Gemini (Text Model)
@@ -38,7 +38,7 @@
 *   **파일:** `app/api/game/lib/prompts.ts`
 *   **내용:** 이미지 생성용 프롬프트 생성 로직 추가.
 *   **스타일 가이드 (Common Prompt):**
-    > "Grayscale Korean manhwa style illustration, clean digital linework, webtoon aesthetic, monochromatic shading with screentones, expressive character design, front-facing gaze, white background, high quality character portrait."
+    > "Grayscale Korean manhwa style illustration, clean digital linework, webtoon aesthetic, monochromatic shading with screentones, expressive character design, front-facing gaze, white background, high quality character portrait, **solo portrait, only one person, single character**."
 *   **개별 프롬프트 조합:**
     *   `[Common Prompt]`, `[Age] year old [Gender] [Role]`, `[Personality] expression`, `[Appearance details]`
 
@@ -50,7 +50,7 @@
     2.  각 용의자에 대한 영문 프롬프트 구성.
     3.  `imagen-4.0-fast-generate-001` 모델 호출 (병렬 처리 권장, 1024x1024 생성).
     4.  **이미지 리사이징 (Optimization):**
-        *   생성된 고해상도 이미지를 `sharp` 라이브러리를 사용하여 **256x256px**로 축소.
+        *   생성된 고해상도 이미지를 `sharp` 라이브러리를 사용하여 **512x512px**로 축소.
         *   포맷을 `WebP` 또는 `JPEG` (Quality 80)로 변환하여 용량 최적화.
     5.  리사이징된 이미지 데이터(Base64)를 `CaseData`에 저장.
     6.  DB 저장 및 클라이언트 응답.
@@ -62,8 +62,8 @@
     {suspect.portraitImage ? (
       <Image 
         src={`data:image/jpeg;base64,${suspect.portraitImage}`} 
-        width={256} 
-        height={256} 
+        width={512} 
+        height={512} 
         alt={suspect.name} 
         className="rounded-full object-cover" // 스타일링
       />

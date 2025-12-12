@@ -56,8 +56,17 @@ export default function DeductionScreen({
                     : 'border-gray-700 bg-gray-900 text-gray-500 hover:border-gray-500'
                 }`}
               >
-                <div className="w-full aspect-square bg-gray-800 mb-2 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform">
-                  <User size={24} />
+                <div className="w-full aspect-square bg-gray-800 mb-2 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform relative border border-gray-600">
+                  {s.portraitImage ? (
+                    <Image 
+                      src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                      alt={s.name} 
+                      fill
+                      className="object-cover"
+                    />
+                  ) : (
+                    <User size={32} />
+                  )}
                 </div>
                 <div className="font-bold text-xs truncate">{s.name}</div>
                 <div className="text-[10px] text-gray-400 truncate mt-1">{s.role}</div>

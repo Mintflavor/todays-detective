@@ -93,8 +93,17 @@ export default function BriefingScreen({ caseData, onStartInvestigation }: Brief
               <div className="grid gap-3">
                 {caseData.suspects.map(s => (
                   <div key={s.id} className="flex items-center gap-4 bg-black/5 p-4 rounded-sm border border-black/10 hover:bg-black/10 transition-colors">
-                    <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center shrink-0 border border-gray-400">
-                      <User className="text-gray-600" size={20} />
+                    <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center shrink-0 border border-gray-400 overflow-hidden relative">
+                      {s.portraitImage ? (
+                        <Image 
+                          src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                          alt={s.name}
+                          fill
+                          className="object-cover"
+                        />
+                      ) : (
+                        <User className="text-gray-600" size={24} />
+                      )}
                     </div>
                     <div>
                       <div className="font-bold text-base text-gray-900">{s.name}</div>

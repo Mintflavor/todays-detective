@@ -47,7 +47,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 1,
       "name": "이름 (순수 한글)",
       "role": "직업 또는 관계",
+      "gender": "성별 (Male 또는 Female)",
+      "age": "나이 (숫자)",
       "personality": "성격 묘사",
+      "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어로 작성, 콤마로 구분. 예: Short hair, glasses, sharp eyes, wearing a suit)",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심 살만한 행동)",
       "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "timeline_truth에 따른 실제 행적",
@@ -57,7 +60,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 2,
       "name": "이름 (순수 한글)",
       "role": "직업/관계",
+      "gender": "...",
+      "age": 30,
       "personality": "...",
+      "image_prompt_keywords": "...",
       "secret": "...",
       // 범인일 경우 motive와 trick 필드가 추가되어야 합니다.
       // "motive": "범행 동기",
@@ -69,7 +75,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 3,
       "name": "이름 (순수 한글)",
       "role": "직업/관계",
+      "gender": "...",
+      "age": 40,
       "personality": "...",
+      "image_prompt_keywords": "...",
       "secret": "...",
       "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "...",
@@ -81,6 +90,18 @@ export const CASE_GENERATION_PROMPT = `
 
 언어: 한국어(Korean)
 `;
+
+export const generatePortraitPrompt = (suspect: Suspect) => {
+  const basePrompt = "Grayscale Korean manhwa style illustration, clean digital linework, webtoon aesthetic, monochromatic shading with screentones, expressive character design, front-facing gaze, white background, high quality character portrait, solo portrait, only one person, single character";
+  const charDetails = `${suspect.age || 30} year old ${suspect.gender || 'Unknown'} ${suspect.role}`;
+  const expression = `${suspect.personality} expression`;
+  // Use image_prompt_keywords if available (needs to be added to Suspect interface if strict typing used here, or handled loosely)
+  // Since Suspect interface is in game.ts, we should update it or cast here.
+  // Assuming suspect object passed here comes from the raw JSON generation which includes 'image_prompt_keywords'.
+  const keywords = (suspect as any).image_prompt_keywords || ""; 
+
+  return `${basePrompt}, ${charDetails}, ${expression}, ${keywords}`;
+};
 
 export const generateSuspectPrompt = (suspect: Suspect, world: WorldSetting, timeline: string[]) => `
 당신은 추리 게임의 용의자 '${suspect.name}'(${suspect.role})입니다.
