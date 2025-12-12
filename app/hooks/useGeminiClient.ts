@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { callGemini } from '../lib/utils';
 import { CaseData, Evaluation } from '../types/game';
 
 interface UseGeminiClientReturn {

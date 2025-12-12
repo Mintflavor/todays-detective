@@ -1,36 +1,3 @@
-import { CaseData } from "../types/game";
-
-export const callGemini = async (prompt: string): Promise<string> => {
-  const response = await fetch('/api/gemini', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt: prompt })
-  });
-
-  const data = await response.json();
-  
-  if (data.error) {
-    const errorMessage = typeof data.error === 'object' 
-      ? (data.error.message || JSON.stringify(data.error)) 
-      : data.error;
-    throw new Error(errorMessage);
-  }
-
-  if (!data.candidates?.[0]?.content?.parts?.[0]?.text) throw new Error("Invalid response from AI");
-  
-  return data.candidates[0].content.parts[0].text;
-};
-
-export const parseJSON = (text: string): CaseData | null => {
-  try {
-    const cleaned = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("JSON Parse Error", e);
-    return null;
-  }
-};
-
 export const getRandomPlaceholder = (): string => {
   const prompts = [
     "알리바이를 물어보세요...",
