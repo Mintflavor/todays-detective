@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { callGemini } from '../lib/utils';
 import { CaseData, Evaluation } from '../types/game';
-import { generateEvaluationPrompt, generateSuspectPrompt, CASE_GENERATION_PROMPT } from '../lib/prompts';
 
 interface UseGeminiClientReturn {
   errorMsg: string | null;

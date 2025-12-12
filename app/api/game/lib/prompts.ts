@@ -29,7 +29,7 @@ export const CASE_GENERATION_PROMPT = `
   },
 
   "evidence_list": [
-    { "name": "증거물 이름 1", "description": "상세 묘사 (중요: 범인을 특정할 수 있는 직접적 단서(이름, 주민번호 등)는 금지. 간접적이고 정황적인 증거여야 함. 예: 립스틱 자국이 묻은 컵, 타다 만 성냥, 찢어진 편지 조각)" },
+    { "name": "증거물 이름 1", "description": "상세 묘사 (중요: 범인을 특정할 수 있는 직접적 단서(이름, 주민번호, 이니셜 등)는 금지. 간접적이고 정황적인 증거여야 함. 예: 립스틱 자국이 묻은 컵, 타다 만 성냥, 찢어진 편지 조각)" },
     { "name": "증거물 이름 2", "description": "상세 묘사" }
     // (증거물은 최대 3개까지만 생성하세요)
   ],
@@ -39,6 +39,7 @@ export const CASE_GENERATION_PROMPT = `
     "20:00 - 사건 발생 직전 상황 (갈등 심화)",
     "20:30 - 사건 발생 추정 시각 및 특이사항 (예: 정전, 소음)",
     "21:00 - 사건 발각"
+    // (사건은 하루 24시 중 언제라도 발생할 수 있습니다)
   ],
 
   "suspects": [
@@ -46,7 +47,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 1,
       "name": "이름 (순수 한글)",
       "role": "직업 또는 관계",
+      "gender": "성별 (Male 또는 Female)",
+      "age": "나이 (숫자)",
       "personality": "성격 묘사",
+      "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어로 작성, 콤마로 구분. 예: Short hair, glasses, sharp eyes, wearing a suit)",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심 살만한 행동)",
       "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "timeline_truth에 따른 실제 행적",
@@ -56,7 +60,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 2,
       "name": "이름 (순수 한글)",
       "role": "직업/관계",
+      "gender": "...",
+      "age": 30,
       "personality": "...",
+      "image_prompt_keywords": "...",
       "secret": "...",
       // 범인일 경우 motive와 trick 필드가 추가되어야 합니다.
       // "motive": "범행 동기",
@@ -68,7 +75,10 @@ export const CASE_GENERATION_PROMPT = `
       "id": 3,
       "name": "이름 (순수 한글)",
       "role": "직업/관계",
+      "gender": "...",
+      "age": 40,
       "personality": "...",
+      "image_prompt_keywords": "...",
       "secret": "...",
       "isCulprit": false, // 중요: AI는 이들 중 단 한 명에게만 isCulprit: true를 할당해야 합니다.
       "real_action": "...",
@@ -80,6 +90,18 @@ export const CASE_GENERATION_PROMPT = `
 
 언어: 한국어(Korean)
 `;
+
+export const generatePortraitPrompt = (suspect: Suspect) => {
+  const basePrompt = "Grayscale Korean manhwa style illustration, clean digital linework, webtoon aesthetic, monochromatic shading with screentones, expressive character design, front-facing gaze, white background, high quality character portrait, solo portrait, only one person, single character";
+  const charDetails = `${suspect.age || 30} year old ${suspect.gender || 'Unknown'} ${suspect.role}`;
+  const expression = `${suspect.personality} expression`;
+  // Use image_prompt_keywords if available (needs to be added to Suspect interface if strict typing used here, or handled loosely)
+  // Since Suspect interface is in game.ts, we should update it or cast here.
+  // Assuming suspect object passed here comes from the raw JSON generation which includes 'image_prompt_keywords'.
+  const keywords = (suspect as any).image_prompt_keywords || ""; 
+
+  return `${basePrompt}, ${charDetails}, ${expression}, ${keywords}`;
+};
 
 export const generateSuspectPrompt = (suspect: Suspect, world: WorldSetting, timeline: string[]) => `
 당신은 추리 게임의 용의자 '${suspect.name}'(${suspect.role})입니다.
@@ -115,8 +137,8 @@ export const generateEvaluationPrompt = (
   isOverTime: boolean
 ) => {
   const penaltyInstruction = isOverTime 
-      ? "\n[중요 페널티]: 탐정이 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '탐정 등급'은 최대 'B'까지만 부여할 수 있습니다." 
-      : "";
+      ? "\n[중요 페널티]: 탐정이 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '시간 관리' 점수는 0점이며, 최종 등급은 최대 'B'까지만 부여할 수 있습니다." 
+      : "탐정은 제한 시간 내에 추리를 완료했습니다. (시간 관리 만점: 10점)";
 
   return `
       [절대 원칙: 사실 왜곡 금지]
@@ -135,11 +157,38 @@ export const generateEvaluationPrompt = (
 
       ${penaltyInstruction}
 
+      [평가 기준 (총 100점)]
+      1. 범인 지목 (40점)
+         - 40점: 진범을 정확히 지목함.
+         - 0점: 엉뚱한 용의자를 지목함.
+
+      2. 논리성 & 증거 (30점)
+         - 30점: 핵심 트릭과 알리바이 모순을 구체적 증거로 논리적 설명.
+         - 20점: 트릭은 간파했으나 구체적 증거 제시 부족.
+         - 10점: 심증에 의존하거나 논리적 비약 심함.
+         - 0점: 근거 없음 또는 모순.
+
+      3. 범행 동기 (20점)
+         - 20점: 범행 동기를 정확히 파악.
+         - 10점: 동기를 짐작했으나 구체적 내용 부족/틀림.
+         - 0점: 동기 언급 없음 또는 오판.
+
+      4. 시간 관리 (10점)
+         - 10점: 제한 시간(10분) 내 완료.
+         - 0점: 제한 시간 초과.
+
+      [등급 체계]
+      - S (95~100점)
+      - A (85~94점)
+      - B (70~84점)
+      - C (50~69점)
+      - F (0~49점)
+
       위 내용을 바탕으로 탐정을 평가해주세요.
       다음 포맷을 엄격히 지켜주세요:
 
       [JUDGMENT]
-      (성공 또는 실패)
+      (성공 또는 실패 - 진범을 맞췄으면 성공)
 
       [GRADE]
       (S/A/B/C/F)

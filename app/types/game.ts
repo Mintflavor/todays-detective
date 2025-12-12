@@ -2,6 +2,10 @@ export interface Suspect {
   id: number;
   name: string;
   role: string;
+  gender?: 'Male' | 'Female' | 'Unknown';
+  age?: number;
+  portraitImage?: string; // Base64 string
+  image_prompt_keywords?: string;
   personality: string;
   secret: string;
   isCulprit: boolean;
@@ -63,6 +67,7 @@ export interface Evaluation {
   grade: string;
   truth: string;
   culpritName: string;
+  culpritImage?: string; // Add portrait image of the culprit
   timeTaken: string;
   caseNumber?: string;
 }

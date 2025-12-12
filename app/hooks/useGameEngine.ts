@@ -4,8 +4,6 @@ import { getRandomPlaceholder, formatTime } from '../lib/utils';
 import { saveScenario } from '../lib/api';
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
-import { generateSuspectPrompt } from '../lib/prompts'; // Import directly for use in send message
-
 
 export default function useGameEngine() {
   // --- Game Flow State ---
@@ -233,11 +231,15 @@ export default function useGameEngine() {
       
       const elapsedSeconds = 600 - timerSeconds;
       const timeTakenStr = formatTime(elapsedSeconds);
+      
+      // Find the real culprit to get their image
+      const realCulprit = caseData.suspects.find(s => s.name === evaluationResult.culpritName);
 
       setEvaluation({
         ...evaluationResult,
         timeTaken: timeTakenStr,
-        caseNumber: caseData.caseNumber 
+        caseNumber: caseData.caseNumber,
+        culpritImage: realCulprit?.portraitImage
       });
       setPhase('resolution');
     } catch (err) {

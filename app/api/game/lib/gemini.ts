@@ -13,13 +13,14 @@ interface GeminiResponse {
 
 export async function callGemini(prompt: string): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
+    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash-preview-09-2025";
 
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment variables");
     }
 
     try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -42,6 +43,53 @@ export async function callGemini(prompt: string): Promise<string> {
 
     } catch (error) {
         console.error("Error calling Gemini API:", error);
+        throw error;
+    }
+}
+
+interface ImageGenerationResponse {
+    predictions: {
+        bytesBase64Encoded: string;
+        mimeType: string;
+    }[];
+}
+
+export async function generateImage(prompt: string): Promise<string> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not defined");
+    }
+
+    try {
+        // Imagen 4 Fast (imagen-4.0-fast-generate-001)
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-fast-generate-001:predict?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                instances: [{ prompt }],
+                parameters: {
+                    aspectRatio: "1:1",
+                    sampleCount: 1,
+                    // Fast model might not support all params, but we'll try standard config
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Imagen API Error:", errorText);
+            throw new Error(`Imagen API error: ${response.status} ${response.statusText}`);
+        }
+
+        const data: ImageGenerationResponse = await response.json();
+        
+        if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+            return data.predictions[0].bytesBase64Encoded;
+        } else {
+            throw new Error("No image data in Imagen response");
+        }
+    } catch (error) {
+        console.error("Image Generation Failed:", error);
         throw error;
     }
 }

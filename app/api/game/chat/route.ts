@@ -3,7 +3,7 @@ import { callGemini } from '../lib/gemini';
 import { generateSuspectPrompt } from '../lib/prompts';
 import { CaseData } from '@/app/types/game';
 
-const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'; 
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL; 
 
 export async function POST(req: Request) {
   try {

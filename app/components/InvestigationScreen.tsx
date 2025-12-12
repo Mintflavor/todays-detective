@@ -219,7 +219,18 @@ export default function InvestigationScreen({
                 }`}
               >
                 <div className="flex flex-col items-center gap-1.5">
-                  <User size={20} className={currentSuspectId === s.id ? "fill-amber-500/20" : ""} />
+                  <div className="relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-800 border border-gray-600">
+                    {s.portraitImage ? (
+                      <Image 
+                        src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                        alt={s.name} 
+                        fill
+                        className={`object-cover ${currentSuspectId === s.id ? "opacity-100" : "opacity-70 grayscale"}`}
+                      />
+                    ) : (
+                      <User size={20} className={currentSuspectId === s.id ? "fill-amber-500/20" : ""} />
+                    )}
+                  </div>
                   <span className="text-xs truncate max-w-full">{s.name}</span>
                 </div>
                 {currentSuspectId === s.id && <div className="absolute top-0 left-0 w-full h-0.5 bg-amber-600"></div>}

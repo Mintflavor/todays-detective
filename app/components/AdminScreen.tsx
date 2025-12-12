@@ -104,7 +104,10 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-black/95 p-4 md:p-6 relative">
+    <div 
+      className="flex flex-col items-center justify-center min-h-screen bg-black/95 p-4 md:p-6 relative"
+      style={{ userSelect: 'text' }}
+    >
       <div className="w-full max-w-4xl bg-[#1a1a1a] text-gray-300 rounded-sm shadow-2xl overflow-hidden relative border border-gray-800 animate-fade-in flex flex-col h-[85vh]">
         {/* Header */}
         <div className="bg-red-900/20 text-red-500 p-4 border-b border-red-900/50 flex items-center justify-between shrink-0">
