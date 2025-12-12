@@ -4,7 +4,7 @@ import { CASE_GENERATION_PROMPT } from '../lib/prompts';
 import { CaseData } from '@/app/types/game';
 
 // Python Backend URL (Adjust if your backend is running elsewhere)
-const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const PYTHON_BACKEND_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function POST() {
   try {
