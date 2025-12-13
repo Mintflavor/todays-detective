@@ -1,5 +1,7 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, ChevronLeft, ChevronRight, FolderOpen } from 'lucide-react';
+import { ArrowLeft, FileText, ChevronLeft, ChevronRight, FolderOpen, Filter } from 'lucide-react';
 import { getScenarios, ScenarioListItem, getScenarioDetail } from '../lib/api';
 import { CaseData } from '../types/game';
 
@@ -13,16 +15,22 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [filterCrimeType, setFilterCrimeType] = useState<string>("ALL");
 
   useEffect(() => {
-    fetchScenarios();
+    setPage(1); // Reset page on filter change
+    fetchScenarios(1);
+  }, [filterCrimeType]);
+
+  useEffect(() => {
+    if (page > 1) fetchScenarios(page);
   }, [page]);
 
-  const fetchScenarios = async () => {
+  const fetchScenarios = async (pageNum: number) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getScenarios(page);
+      const data = await getScenarios(pageNum, 10, filterCrimeType);
       setScenarios(data);
     } catch (err) {
       setError("사건 기록을 불러올 수 없습니다. 서버 상태를 확인하세요.");
@@ -54,7 +62,23 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
           <ArrowLeft size={20} /> 뒤로가기
         </button>
         <h1 className="text-2xl font-bold text-amber-600 tracking-widest uppercase">수사 자료실</h1>
-        <div className="w-20"></div> {/* Spacer */}
+        
+        {/* Filter Dropdown */}
+        <div className="flex items-center gap-2">
+            <Filter size={16} className="text-gray-500" />
+            <select 
+            value={filterCrimeType} 
+            onChange={(e) => setFilterCrimeType(e.target.value)}
+            className="bg-gray-800 text-gray-300 border border-gray-700 text-sm p-2 rounded-sm focus:outline-none focus:border-amber-600 cursor-pointer"
+            >
+            <option value="ALL">전체 사건</option>
+            <option value="살인">살인</option>
+            <option value="방화">방화</option>
+            <option value="납치">납치</option>
+            <option value="강도">강도</option>
+            <option value="절도">절도</option>
+            </select>
+        </div>
       </header>
 
       <div className="w-full max-w-4xl flex-1 z-10">
@@ -69,7 +93,9 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
         ) : (
           <div className="grid gap-4">
             {scenarios.length === 0 && !loading ? (
-              <div className="text-center text-gray-500 py-20">저장된 사건 기록이 없습니다.</div>
+              <div className="text-center text-gray-500 py-20">
+                <p>해당 조건의 사건 기록이 없습니다.</p>
+              </div>
             ) : (
               scenarios.map((scenario) => (
                 <button
@@ -86,7 +112,9 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
                   </div>
                   <p className="text-sm text-gray-400 line-clamp-2 pl-6">{scenario.summary}</p>
                   <div className="mt-3 pl-6">
-                    <span className="text-[10px] bg-gray-900 text-gray-500 px-2 py-1 rounded border border-gray-700 uppercase tracking-wider">
+                    <span className={`text-[10px] px-2 py-1 rounded border uppercase tracking-wider
+                        ${scenario.crime_type === '살인' ? 'bg-red-950/50 border-red-900 text-red-400' : 'bg-gray-900 border-gray-700 text-gray-500'}
+                    `}>
                       {scenario.crime_type}
                     </span>
                   </div>

@@ -32,8 +32,12 @@ export async function saveScenario(caseData: CaseData) {
   return response.json();
 }
 
-export async function getScenarios(page: number = 1, limit: number = 10): Promise<ScenarioListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/scenarios/?page=${page}&limit=${limit}`);
+export async function getScenarios(page: number = 1, limit: number = 10, crimeType?: string): Promise<ScenarioListItem[]> {
+  let url = `${API_BASE_URL}/scenarios/?page=${page}&limit=${limit}`;
+  if (crimeType && crimeType !== "ALL") {
+    url += `&crime_type=${encodeURIComponent(crimeType)}`;
+  }
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to fetch scenarios");
   }

@@ -25,10 +25,16 @@ async def create_scenario(scenario: ScenarioCreate):
 @router.get("/", response_model=List[ScenarioResponse])
 async def get_scenarios(
     page: int = Query(1, ge=1), 
-    limit: int = Query(10, ge=1, le=50)
+    limit: int = Query(10, ge=1, le=50),
+    crime_type: str = Query(None, description="Filter by crime type (e.g., 살인, 방화, 납치, 강도, 절도)")
 ):
     skip = (page - 1) * limit
-    cursor = scenario_collection.find({}, {"case_data": 0}).sort("created_at", -1).skip(skip).limit(limit)
+    
+    query = {}
+    if crime_type:
+        query["crime_type"] = crime_type
+
+    cursor = scenario_collection.find(query, {"case_data": 0}).sort("created_at", -1).skip(skip).limit(limit)
     scenarios = await cursor.to_list(length=limit)
     return [fix_id(s) for s in scenarios]
 
