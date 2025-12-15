@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className="font-serif bg-gray-950 text-gray-100 antialiased">
         <AssetPreloader />
         {children}

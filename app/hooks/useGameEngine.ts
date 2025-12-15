@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent, useCallback } from 'react';
 import { CaseData, ChatLogs, DeductionInput, Evaluation, GamePhase, LoadingType, ChatMessage } from '../types/game';
 import { getRandomPlaceholder, formatTime } from '../lib/utils';
-import { saveScenario } from '../lib/api';
+
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
 
 export default function useGameEngine() {
   // --- Game Flow State ---
   const [phase, setPhase] = useState<GamePhase>('intro');
-  
+
   // --- Game Data State ---
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [preloadedData, setPreloadedData] = useState<CaseData | null>(null);
@@ -16,7 +16,7 @@ export default function useGameEngine() {
   const [chatLogs, setChatLogs] = useState<ChatLogs>({ 0: [], 1: [], 2: [], 3: [] });
   const [actionPoints, setActionPoints] = useState<number>(20);
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
-  
+
   // --- UI & Audio State ---
   const [userInput, setUserInput] = useState<string>("");
   const [isTyping, setIsTyping] = useState<boolean>(false);
@@ -68,12 +68,12 @@ export default function useGameEngine() {
           "검찰 송치 서류 준비 중...", "사건의 진상을 재구성하는 중...", "모순점 최종 확인 중..."
         ];
       }
-      
+
       let i = 0;
       const interval = setInterval(() => {
         i = (i + 1) % texts.length;
         setLoadingText(texts[i]);
-      }, 3000); 
+      }, 3000);
       return () => clearInterval(interval);
     }
   }, [phase, loadingType]);
@@ -102,11 +102,11 @@ export default function useGameEngine() {
 
   const finalizeGameStart = useCallback((data: CaseData) => {
     setCaseData(data);
-    setPreloadedData(null); 
+    setPreloadedData(null);
     setPhase('briefing');
-    const initialMsg: ChatMessage = { 
-      role: 'system', 
-      text: `[현장 정보] ${data.world_setting.location}\n[날씨] ${data.world_setting.weather}` 
+    const initialMsg: ChatMessage = {
+      role: 'system',
+      text: `[현장 정보] ${data.world_setting.location}\n[날씨] ${data.world_setting.weather}`
     };
     setChatLogs({
       0: [{ role: 'system', text: '수사 수첩입니다. 이곳에 자유롭게 메모를 남기세요. (AP 소모 없음)' }],
@@ -119,7 +119,7 @@ export default function useGameEngine() {
   const handleStartGame = useCallback(() => {
     setPhase('tutorial');
     if (audioRef.current) {
-      audioRef.current.volume = 0.3; 
+      audioRef.current.volume = 0.3;
       audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
     }
 
@@ -128,13 +128,13 @@ export default function useGameEngine() {
         const data = await generateCase();
         // Generate random Case ID
         data.caseNumber = Math.floor(100000 + Math.random() * 900000).toString();
-        
+
         // Shuffle suspects to prevent predictable culprit position
         data.suspects.sort(() => Math.random() - 0.5);
-        
+
         setPreloadedData(data);
         // Automatically save generated scenario to backend - REMOVED: Already saved in generateCase (server-side)
-        // saveScenario(data).catch(err => console.error("Failed to auto-save scenario:", err));
+
       } catch (err) {
         console.error("Background Fetch Error:", err);
       }
@@ -146,15 +146,15 @@ export default function useGameEngine() {
     if (preloadedData) {
       finalizeGameStart(preloadedData);
     } else {
-      setLoadingType('case'); 
-      setLoadingText("사건 파일을 불러오는 중..."); 
+      setLoadingType('case');
+      setLoadingText("사건 파일을 불러오는 중...");
       setPhase('loading');
     }
   }, [preloadedData, finalizeGameStart]);
 
   const handleSendMessage = useCallback(async () => {
     if (!userInput.trim() || isTyping || !caseData || !caseData.scenarioId) return;
-    
+
     // Note tab logic
     if (currentSuspectId === 0) {
       setChatLogs(prev => ({
@@ -162,7 +162,7 @@ export default function useGameEngine() {
         0: [...prev[0], { role: 'note', text: userInput }]
       }));
       setUserInput("");
-      return; 
+      return;
     }
 
     if (actionPoints <= 0) return;
@@ -179,10 +179,10 @@ export default function useGameEngine() {
     setIsTyping(true);
 
     try {
-      const history = chatLogs[currentSuspectId].map(msg => 
+      const history = chatLogs[currentSuspectId].map(msg =>
         msg.role === 'user' ? `탐정: ${msg.text}` : `용의자: ${msg.text}`
       ).join('\n');
-      
+
       const reply = await interrogateSuspect(
         caseData.scenarioId,
         suspect.id,
@@ -196,7 +196,7 @@ export default function useGameEngine() {
     } catch (err) {
       console.error("Interrogation error:", err);
       setErrorMsg("용의자와의 통신이 끊겼습니다.");
-      setRetryAction(() => handleSendMessageRef.current); 
+      setRetryAction(() => handleSendMessageRef.current);
     } finally {
       setIsTyping(false);
     }
@@ -214,10 +214,10 @@ export default function useGameEngine() {
   const submitDeduction = useCallback(async () => {
     if (!caseData || !deductionInput.culpritId || !caseData.scenarioId) return;
 
-    setLoadingType('deduction'); 
-    setLoadingText("최종 추리 보고서 작성 중..."); 
+    setLoadingType('deduction');
+    setLoadingText("최종 추리 보고서 작성 중...");
     setPhase('loading');
-    
+
     const chosenSuspect = caseData.suspects.find(s => s.id === deductionInput.culpritId);
     if (!chosenSuspect) return;
 
@@ -228,10 +228,10 @@ export default function useGameEngine() {
         deductionInput.reasoning,
         isOverTime
       );
-      
+
       const elapsedSeconds = 600 - timerSeconds;
       const timeTakenStr = formatTime(elapsedSeconds);
-      
+
       // Find the real culprit to get their image
       const realCulprit = caseData.suspects.find(s => s.name === evaluationResult.culpritName);
 
