@@ -9,10 +9,31 @@ export async function callGemini(prompt: string): Promise<string> {
     try {
         const genAI = new GoogleGenAI({ apiKey });
         const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
-        const response = await genAI.models.generateContent({
+        
+        // Optimize prompt to save tokens:
+        // 1. Remove leading indentation from each line
+        // 2. Replace 3+ newlines with 2 (preserve paragraph separation but reduce excess)
+        // 3. Trim the final result
+        const optimizedPrompt = prompt
+            .replace(/^[ \t]+/gm, '') 
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
+        const requestParams = {
             model: model,
-            contents: [{ parts: [{ text: prompt }] }],
-        });
+            contents: [{ parts: [{ text: optimizedPrompt }] }],
+        };
+
+        console.log("--- [Gemini API FULL Request] ---");
+        console.log(JSON.stringify(requestParams, null, 2));
+        console.log("---------------------------------");
+
+        const response = await genAI.models.generateContent(requestParams);
+
+        console.log("--- [Gemini API FULL Response] ---");
+        // Log the full response object to see all details including metadata
+        console.log(JSON.stringify(response, null, 2));
+        console.log("----------------------------------");
 
         if (response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts && response.candidates[0].content.parts.length > 0) {
              const text = response.candidates[0].content.parts[0].text;
