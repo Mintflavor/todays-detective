@@ -44,11 +44,11 @@ export default function ResolutionScreen({ evaluation, caseData, onReset }: Reso
             {/* Image Area */}
             <div className="bg-gray-200 aspect-square mb-4 flex items-center justify-center relative overflow-hidden">
               {(showTruth || evaluation.isCorrect) && evaluation.culpritImage ? (
-                <Image 
-                  src={`data:image/jpeg;base64,${evaluation.culpritImage}`} 
+                <Image
+                  src={evaluation.culpritImage.startsWith('http') ? evaluation.culpritImage : `data:image/jpeg;base64,${evaluation.culpritImage}`}
                   alt="Culprit"
                   fill
-                  className="object-cover grayscale contrast-125" // Noir style effect
+                  className="object-cover grayscale contrast-125"
                 />
               ) : (
                 <User size={80} className="text-gray-400" />
@@ -228,8 +228,8 @@ export default function ResolutionScreen({ evaluation, caseData, onReset }: Reso
                     <div key={s.id} className="flex items-center gap-4 bg-black/5 p-4 rounded-sm border border-black/10">
                       <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center shrink-0 border border-gray-400 overflow-hidden relative">
                         {s.portraitImage ? (
-                          <Image 
-                            src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                          <Image
+                            src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
                             alt={s.name}
                             fill
                             className="object-cover"

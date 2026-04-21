@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { callGemini, generateImage } from '../lib/gemini';
 import { CASE_GENERATION_PROMPT, generatePortraitPrompt } from '../lib/prompts';
+import { uploadPortraitToS3 } from '../lib/s3';
 import { CaseData } from '@/app/types/game';
 import sharp from 'sharp';
 
@@ -36,7 +37,7 @@ export async function POST() {
                     .toFormat('jpeg', { quality: 80 })
                     .toBuffer();
                 
-                suspect.portraitImage = resizedBuffer.toString('base64');
+                suspect.portraitImage = await uploadPortraitToS3(resizedBuffer);
             } catch (err) {
                 console.error(`Failed to generate/resize image for suspect ${suspect.id}:`, err);
                 // Continue without image (fallback to icon)
