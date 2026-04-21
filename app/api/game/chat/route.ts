@@ -40,7 +40,7 @@ export async function POST(req: Request) {
     // Convert timeline objects to strings if necessary, or adjust generateSuspectPrompt to accept objects
     const timelineStrings = Array.isArray(timeline) ? timeline : [];
 
-    const systemPrompt = generateSuspectPrompt(suspect, worldSetting, timelineStrings);
+    const systemPrompt = generateSuspectPrompt(suspect, worldSetting, timelineStrings, caseData.evidence_list);
     const fullPrompt = `${systemPrompt}\n\n[이전 대화]\n${history}\n\n탐정: ${message}\n용의자:`;
 
     // 4. Call Gemini
