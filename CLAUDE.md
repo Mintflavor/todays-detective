@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+### 모든 코드를 작성할 땐 코드 파일 최상단에 아래 문구를 주석으로 추가해주세요.
+작성자 : 박현일
+이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+
+Author: Hyunil Park
+Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 ## Project Overview
 
 **Today's Detective** is a full-stack interactive detective game where players investigate AI-generated mystery cases. Players interrogate suspects powered by Google Gemini and submit their deduction to receive an AI-evaluated score.
