@@ -42,3 +42,7 @@ next-env.d.ts
 
 .claude/
 .playwright-mcp/
+
+# AWS Lambda build artifacts
+/lambda/package/
+/lambda/function.zip
