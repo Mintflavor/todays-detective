@@ -6,6 +6,9 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export async function GET(
@@ -14,7 +17,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  const res = await fetch(`${BACKEND_URL}/scenarios/${id}`);
+  const res = await fetch(`${BACKEND_URL}/scenarios/${id}`, { cache: 'no-store' });
   if (!res.ok) {
     return NextResponse.json({ error: 'Scenario not found' }, { status: res.status });
   }
@@ -26,19 +29,14 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid scenario data' }, { status: 500 });
   }
 
-  const sanitized = {
-    ...caseData,
-    solution: undefined,
-    timeline_truth: undefined,
-    suspects: (caseData.suspects || []).map((s: Record<string, unknown>) => ({
-      ...s,
-      isCulprit: undefined,
-      secret: undefined,
-      real_action: undefined,
-      motive: undefined,
-      trick: undefined,
-    })),
-  };
+  const { solution: _s, timeline_truth: _t, suspects, ...rest } = caseData;
+  const sanitizedSuspects = (suspects || []).map((s: Record<string, unknown>) => {
+    const { isCulprit: _c, secret: _se, real_action: _r, motive: _m, trick: _tr, ...suspectRest } = s;
+    return suspectRest;
+  });
 
-  return NextResponse.json(sanitized);
+  return NextResponse.json(
+    { ...rest, suspects: sanitizedSuspects },
+    { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } }
+  );
 }
