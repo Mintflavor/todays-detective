@@ -85,7 +85,7 @@ export default function TodaysDetective() {
       />
 
       {/* Background Audio */}
-      <audio ref={audioRef} src="/bgm/noir_theme.mp3" loop />
+      <audio ref={audioRef} src="/bgm/Cold_Coffee_at_Three_compressed.mp3" loop preload="auto" />
 
       {/* Screen Routing */}
       {phase === 'intro' && (

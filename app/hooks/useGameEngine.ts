@@ -24,7 +24,7 @@ export default function useGameEngine() {
   const [loadingType, setLoadingType] = useState<LoadingType>('case');
   const [inputPlaceholder, setInputPlaceholder] = useState<string>("");
   const [deductionInput, setDeductionInput] = useState<DeductionInput>({ culpritId: null, reasoning: "" });
-  const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [isMuted, setIsMuted] = useState<boolean>(true);
   const [showTimeOverModal, setShowTimeOverModal] = useState<boolean>(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -41,8 +41,14 @@ export default function useGameEngine() {
   // --- Effects ---
 
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.muted = isMuted;
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isMuted) {
+      audio.pause();
+    } else {
+      audio.volume = 0.2;
+      if (audio.readyState === 0) audio.load();
+      audio.play().catch(e => console.log("Audio play prevented:", e));
     }
   }, [isMuted]);
 
@@ -118,10 +124,6 @@ export default function useGameEngine() {
 
   const handleStartGame = useCallback(() => {
     setPhase('tutorial');
-    if (audioRef.current) {
-      audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(e => console.log("Audio autoplay prevented", e));
-    }
 
     const fetchCase = async () => {
       try {
