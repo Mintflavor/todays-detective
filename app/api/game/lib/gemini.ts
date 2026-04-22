@@ -1,6 +1,11 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 import { GoogleGenAI } from '@google/genai';
 
-export async function callGemini(prompt: string): Promise<string> {
+export async function callGemini(prompt: string, modelOverride?: string): Promise<string> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment variables");
@@ -8,7 +13,7 @@ export async function callGemini(prompt: string): Promise<string> {
 
     try {
         const genAI = new GoogleGenAI({ apiKey });
-        const model = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+        const model = modelOverride || process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
         
         // Optimize prompt to save tokens:
         // 1. Remove leading indentation from each line
@@ -57,8 +62,9 @@ export async function generateImage(prompt: string): Promise<string> {
 
     try {
         const genAI = new GoogleGenAI({ apiKey });
+        const imageModel = process.env.IMAGEN_MODEL || 'imagen-4.0-fast-generate-001';
         const response = await genAI.models.generateImages({
-            model: 'imagen-4.0-fast-generate-001',
+            model: imageModel,
             prompt: prompt,
             config: {
                 numberOfImages: 1,
