@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { BookOpen, Trash2, XCircle, ChevronDown, ChevronUp, User, Skull, Gavel, ArrowLeft, ArrowRight, MonitorPlay, X } from 'lucide-react';
-import { getScenarios, deleteScenario, getScenarioDetail, ScenarioListItem } from '../lib/api';
+import { getScenarios, deleteScenario, getScenarioDetailFull, ScenarioListItem } from '../lib/api';
 import { CaseData, ChatLogs, Evaluation, DeductionInput } from '../types/game';
 import ErrorModal from './ErrorModal';
 import IntroScreen from './IntroScreen';
@@ -85,7 +85,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
     setDetailData(null);
 
     try {
-      const data = await getScenarioDetail(id);
+      const data = await getScenarioDetailFull(id);
       setDetailData(data);
     } catch (error) {
       setErrorMsg("상세 정보를 불러오는데 실패했습니다: " + (error as Error).message);
@@ -145,7 +145,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
     try {
       // Use the first available scenario for testing
       const targetId = scenarios[0]._id;
-      const data = await getScenarioDetail(targetId);
+      const data = await getScenarioDetailFull(targetId);
       setTestCaseData(data);
       
       // Initialize mocks based on data
