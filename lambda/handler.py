@@ -26,6 +26,7 @@ def get_collection():
     if _client is None:
         _client = MongoClient(
             os.environ["MONGODB_URL"],
+            authMechanism="MONGODB-AWS",
             serverSelectionTimeoutMS=5000,
         )
     return _client["todays_detective"]["scenarios"]
