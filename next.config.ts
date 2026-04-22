@@ -14,10 +14,6 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/:path*',
-        destination: `${API_URL}/scenarios/:path*`, // Proxy to Backend
-      },
-      {
         source: '/server/scenarios/:path*',
         destination: `${API_URL}/scenarios/:path*`, // Proxy to Backend
       },
