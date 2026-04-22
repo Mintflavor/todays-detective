@@ -43,8 +43,9 @@ export async function POST(req: Request) {
     const systemPrompt = generateSuspectPrompt(suspect, worldSetting, timelineStrings, caseData.evidence_list);
     const fullPrompt = `${systemPrompt}\n\n[이전 대화]\n${history}\n\n탐정: ${message}\n용의자:`;
 
-    // 4. Call Gemini
-    const reply = await callGemini(fullPrompt);
+    // 4. Call Gemini (대화 전용 모델 사용)
+    const chatModel = process.env.GEMINI_CHAT_MODEL;
+    const reply = await callGemini(fullPrompt, chatModel);
 
     // 5. Return only the reply
     return NextResponse.json({ reply });

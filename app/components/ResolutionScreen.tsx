@@ -1,17 +1,80 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope } from 'lucide-react';
-import { Evaluation, CaseData } from '../types/game';
+import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { Evaluation, CaseData, DeductionInput } from '../types/game';
+import { submitFeedback } from '../lib/api';
 
 interface ResolutionScreenProps {
   evaluation: Evaluation;
   caseData: CaseData;
+  deductionInput?: DeductionInput;
   onReset: () => void;
 }
 
-export default function ResolutionScreen({ evaluation, caseData, onReset }: ResolutionScreenProps) {
+const FEEDBACK_MAX_LENGTH = 300;
+
+export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset }: ResolutionScreenProps) {
   const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
   const [showBriefing, setShowBriefing] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSending, setFeedbackSending] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  const closeFeedbackModal = () => {
+    if (feedbackSending) return;
+    setShowFeedback(false);
+    setFeedbackError(null);
+    setTimeout(() => {
+      setFeedbackText('');
+      setFeedbackSent(false);
+    }, 300);
+  };
+
+  const handleSubmitFeedback = async () => {
+    const trimmed = feedbackText.trim();
+    if (!trimmed || feedbackSending) return;
+    setFeedbackSending(true);
+    setFeedbackError(null);
+    try {
+      const selectedSuspect = deductionInput?.culpritId
+        ? caseData.suspects.find(s => s.id === deductionInput.culpritId)
+        : undefined;
+
+      await submitFeedback({
+        content: trimmed,
+        scenarioId: caseData.scenarioId,
+        grade: evaluation.grade,
+        gameResult: {
+          scenarioTitle: caseData.title,
+          selectedSuspectId: deductionInput?.culpritId ?? null,
+          selectedSuspectName: selectedSuspect?.name ?? null,
+          reasoning: deductionInput?.reasoning ?? '',
+          isCorrect: evaluation.isCorrect,
+          grade: evaluation.grade,
+          culpritName: evaluation.culpritName,
+          report: evaluation.report,
+          advice: evaluation.advice,
+          timeTaken: evaluation.timeTaken,
+        },
+      });
+      setFeedbackSent(true);
+      setTimeout(() => {
+        closeFeedbackModal();
+      }, 2000);
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : '피드백 전송에 실패했습니다.');
+    } finally {
+      setFeedbackSending(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 p-6 font-serif overflow-y-auto relative">
@@ -143,12 +206,18 @@ export default function ResolutionScreen({ evaluation, caseData, onReset }: Reso
           </div>
         </div>
 
-        <div className="flex justify-center pt-8 border-t border-gray-700">
-            <button 
+        <div className="flex flex-col md:flex-row justify-center items-stretch md:items-center gap-3 pt-8 border-t border-gray-700">
+            <button
             onClick={onReset}
             className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-12 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
           >
             <RefreshCw size={20} /> 새로운 사건 맡기
+          </button>
+          <button
+            onClick={() => setShowFeedback(true)}
+            className="w-full md:w-auto bg-gray-800 hover:bg-gray-700 text-gray-200 py-4 px-8 rounded-sm font-bold shadow-lg border border-gray-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
+          >
+            <MessageSquare size={20} /> 사무소로 피드백 보내기
           </button>
         </div>
 
@@ -250,13 +319,98 @@ export default function ResolutionScreen({ evaluation, caseData, onReset }: Reso
             </div>
             
             <div className="p-4 bg-gray-200 border-t border-gray-300 text-center shrink-0">
-              <button 
+              <button
                 onClick={() => setShowBriefing(false)}
                 className="px-8 py-3 bg-gray-800 text-white rounded-sm font-bold text-sm hover:bg-gray-700 transition-colors uppercase tracking-widest"
               >
                 닫기
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="w-full max-w-md bg-[#1a1a1a] text-gray-200 rounded-sm shadow-2xl overflow-hidden relative flex flex-col border border-gray-700">
+            <div className="bg-gray-800 p-4 flex justify-between items-center shrink-0 border-b border-amber-900/30">
+              <h3 className="font-bold text-lg flex items-center gap-2 font-serif text-amber-500">
+                <MessageSquare size={20} /> 사무소로 피드백 보내기
+              </h3>
+              <button
+                onClick={closeFeedbackModal}
+                disabled={feedbackSending}
+                className="text-gray-400 hover:text-white transition-colors disabled:opacity-30"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              {feedbackSent ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center gap-3 animate-fade-in">
+                  <CheckCircle size={48} className="text-amber-500" />
+                  <p className="text-lg font-serif text-gray-100">소중한 피드백 감사합니다.</p>
+                  <p className="text-xs text-gray-500 font-mono tracking-widest uppercase">Message Delivered</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 font-serif leading-relaxed">
+                    게임에 대한 의견이나 개선 사항을 사무소로 전해주세요. 최대 300자까지 남길 수 있습니다.
+                  </p>
+                  <div className="relative">
+                    <textarea
+                      value={feedbackText}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v.length <= FEEDBACK_MAX_LENGTH) setFeedbackText(v);
+                      }}
+                      maxLength={FEEDBACK_MAX_LENGTH}
+                      disabled={feedbackSending}
+                      placeholder="자유롭게 작성해주세요..."
+                      rows={6}
+                      className="w-full bg-black/40 border border-gray-700 focus:border-amber-700 focus:outline-none text-gray-200 text-sm p-3 rounded-sm resize-none font-serif placeholder-gray-600"
+                    />
+                    <div className="absolute bottom-2 right-3 text-[10px] font-mono text-gray-500">
+                      {feedbackText.length} / {FEEDBACK_MAX_LENGTH}
+                    </div>
+                  </div>
+
+                  {feedbackError && (
+                    <p className="text-xs text-red-400 font-mono">{feedbackError}</p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {!feedbackSent && (
+              <div className="p-4 bg-black/40 border-t border-gray-800 flex gap-3 shrink-0">
+                <button
+                  onClick={closeFeedbackModal}
+                  disabled={feedbackSending}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors disabled:opacity-40"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleSubmitFeedback}
+                  disabled={feedbackSending || !feedbackText.trim()}
+                  className="flex-1 bg-amber-800 hover:bg-amber-700 text-amber-100 py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  {feedbackSending ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-amber-100 border-t-transparent rounded-full animate-spin" />
+                      전송 중
+                    </>
+                  ) : (
+                    <>
+                      <Send size={14} /> 전송
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

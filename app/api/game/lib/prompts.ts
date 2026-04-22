@@ -66,7 +66,7 @@ export const CASE_GENERATION_PROMPT = `
       "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어)",
       "secret": "숨기고 있는 비밀",
       "isCulprit": true,
-      "motive": "범행 동기 (isCulprit: true인 용의자에게만 포함)",
+      "motive": "범행 동기 (isCulprit: true인 용의자에게만 포함)",이것처럼 초상화 생성 프롬프트가 일부 누락되는거같은데 확인좀 해줘
       "trick": "world_setting과 evidence_list를 활용한 구체적이고 논리적인 트릭 (isCulprit: true인 용의자에게만 포함)",
       "real_action": "실제 범행 행동",
       "alibi_claim": "거짓 알리바이"
@@ -85,7 +85,7 @@ export const CASE_GENERATION_PROMPT = `
       "alibi_claim": "알리바이"
     }
   ],
-  "solution": "사건의 전말 (누가, 왜, 어떻게 범행을 저질렀는지 논리적 해설. 게임이 끝날 때까지 절대 변하지 않는 유일한 정답입니다.)"
+  "solution": "사건의 전말 (누가, 왜, 어떻게 범행을 저질렀는지 육하원칙을 따른 논리적 해설과 범행 동기를 설명. 게임이 끝날 때까지 절대 변하지 않는 유일한 정답입니다.)"
 }
 
 언어: 한국어(Korean)
@@ -198,5 +198,6 @@ export const generateEvaluationPrompt = (
       [ADVICE]
       (탐정이 놓친 핵심 질문이나 단서 2가지. "아쉬운 점: ~를 물어봤어야 했다, ~을 생각해야 했다." 형식으로 구체적으로.)
       (탐정이 완벽한 추리를 했다면 "없음"이라고 출력하세요. 이 섹션은 반드시 출력해야 합니다.)
+      (탐정이 추리에 실패했다면 범인의 이름 등 스포일러가 될 수 있는 내용은 절대 포함하지 마세요.)
     `;
 };

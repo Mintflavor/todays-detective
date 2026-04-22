@@ -21,7 +21,7 @@ CORS_HEADERS = {
 }
 
 
-def get_collection():
+def _get_db():
     global _client
     if _client is None:
         _client = MongoClient(
@@ -29,7 +29,15 @@ def get_collection():
             authMechanism="MONGODB-AWS",
             serverSelectionTimeoutMS=5000,
         )
-    return _client["todays_detective"]["scenarios"]
+    return _client["todays_detective"]
+
+
+def get_collection():
+    return _get_db()["scenarios"]
+
+
+def get_feedback_collection():
+    return _get_db()["feedbacks"]
 
 
 def response(status, body):
@@ -106,5 +114,62 @@ def handler(event, context):
         if result.deleted_count == 0:
             return response(404, {"detail": "Not found"})
         return response(200, {"deleted": sid})
+
+    if method == "POST" and path.rstrip("/") == "/feedbacks":
+        content = (body.get("content") or "").strip()
+        if not content:
+            return response(400, {"detail": "content is required"})
+        if len(content) > 300:
+            return response(400, {"detail": "content exceeds 300 characters"})
+        fb_col = get_feedback_collection()
+        doc = {
+            "content": content,
+            "scenario_id": body.get("scenario_id"),
+            "grade": body.get("grade"),
+            "game_result": body.get("game_result"),
+            "created_at": datetime.now(timezone.utc),
+        }
+        result = fb_col.insert_one(doc)
+        return response(201, {"_id": str(result.inserted_id)})
+
+    if method == "GET" and path.rstrip("/") == "/feedbacks":
+        page = max(int(params.get("page", 1)), 1)
+        limit = min(max(int(params.get("limit", 10)), 1), 50)
+        skip = (page - 1) * limit
+        fb_col = get_feedback_collection()
+        docs = list(
+            fb_col.find({})
+            .sort("created_at", -1)
+            .skip(skip)
+            .limit(limit)
+        )
+        for d in docs:
+            d["_id"] = str(d["_id"])
+            gr = d.get("game_result")
+            if isinstance(gr, dict):
+                d["game_result"] = {
+                    "scenarioTitle": gr.get("scenario_title"),
+                    "selectedSuspectId": gr.get("selected_suspect_id"),
+                    "selectedSuspectName": gr.get("selected_suspect_name"),
+                    "reasoning": gr.get("reasoning"),
+                    "isCorrect": gr.get("is_correct"),
+                    "grade": gr.get("grade"),
+                    "culpritName": gr.get("culprit_name"),
+                    "report": gr.get("report"),
+                    "advice": gr.get("advice"),
+                    "timeTaken": gr.get("time_taken"),
+                }
+        return response(200, docs)
+
+    if method == "DELETE" and path.startswith("/feedbacks/"):
+        fid = path.rstrip("/").split("/")[-1]
+        fb_col = get_feedback_collection()
+        try:
+            result = fb_col.delete_one({"_id": ObjectId(fid)})
+        except Exception:
+            return response(400, {"detail": "Invalid id"})
+        if result.deleted_count == 0:
+            return response(404, {"detail": "Not found"})
+        return response(200, {"deleted": fid})
 
     return response(404, {"detail": "Not found"})
