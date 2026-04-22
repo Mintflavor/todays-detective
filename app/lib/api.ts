@@ -25,6 +25,14 @@ export async function getScenarios(page: number = 1, limit: number = 10, crimeTy
 }
 
 export async function getScenarioDetail(id: string): Promise<CaseData> {
+  const response = await fetch(`/api/game/scenario/${id}`, { cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error("Failed to fetch scenario detail");
+  }
+  return response.json();
+}
+
+export async function getScenarioDetailFull(id: string): Promise<CaseData> {
   const response = await fetch(`${API_BASE_URL}/scenarios/${id}`);
   if (!response.ok) {
     throw new Error("Failed to fetch scenario detail");
