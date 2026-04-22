@@ -1,8 +1,14 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Trash2, XCircle, ChevronDown, ChevronUp, User, Skull, Gavel, ArrowLeft, ArrowRight, MonitorPlay, X } from 'lucide-react';
-import { getScenarios, deleteScenario, getScenarioDetailFull, ScenarioListItem } from '../lib/api';
+import { BookOpen, Trash2, XCircle, ChevronDown, ChevronUp, User, Skull, Gavel, ArrowLeft, ArrowRight, MonitorPlay, X, MessageSquare } from 'lucide-react';
+import { getScenarios, deleteScenario, getScenarioDetailFull, ScenarioListItem, getFeedbacks, deleteFeedback, FeedbackItem } from '../lib/api';
 import { CaseData, ChatLogs, Evaluation, DeductionInput } from '../types/game';
 import ErrorModal from './ErrorModal';
 import IntroScreen from './IntroScreen';
@@ -17,6 +23,7 @@ interface AdminScreenProps {
 }
 
 type TestScreenType = 'NONE' | 'INTRO' | 'LOADING' | 'BRIEFING' | 'INVESTIGATION' | 'DEDUCTION' | 'RESOLUTION';
+type AdminTab = 'SCENARIOS' | 'FEEDBACKS';
 
 export default function AdminScreen({ onExit }: AdminScreenProps) {
   // Data State
@@ -50,6 +57,18 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
   // Mock States for Deduction Test
   const [mockDeductionInput, setMockDeductionInput] = useState<DeductionInput>({ culpritId: null, reasoning: "" });
 
+  // Tab State
+  const [activeTab, setActiveTab] = useState<AdminTab>('SCENARIOS');
+
+  // Feedback State
+  const [feedbacks, setFeedbacks] = useState<FeedbackItem[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState<boolean>(false);
+  const [feedbackPage, setFeedbackPage] = useState<number>(1);
+  const [feedbackHasMore, setFeedbackHasMore] = useState<boolean>(true);
+  const [feedbackToDelete, setFeedbackToDelete] = useState<FeedbackItem | null>(null);
+  const [expandedFeedbackId, setExpandedFeedbackId] = useState<string | null>(null);
+  const FEEDBACK_ITEMS_PER_PAGE = 10;
+
   const fetchScenarios = async (pageNum: number) => {
     setLoading(true);
     setErrorMsg(null);
@@ -72,6 +91,39 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
   useEffect(() => {
     if (page > 1) fetchScenarios(page);
   }, [page]);
+
+  const fetchFeedbacks = async (pageNum: number) => {
+    setFeedbackLoading(true);
+    setErrorMsg(null);
+    try {
+      const data = await getFeedbacks(pageNum, FEEDBACK_ITEMS_PER_PAGE);
+      setFeedbacks(data);
+      setFeedbackHasMore(data.length === FEEDBACK_ITEMS_PER_PAGE);
+    } catch (error) {
+      setErrorMsg("피드백 목록을 불러오는데 실패했습니다: " + (error as Error).message);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'FEEDBACKS') {
+      fetchFeedbacks(feedbackPage);
+    }
+  }, [activeTab, feedbackPage]);
+
+  const handleConfirmDeleteFeedback = async () => {
+    if (!feedbackToDelete) return;
+    setErrorMsg(null);
+    try {
+      await deleteFeedback(feedbackToDelete._id);
+      fetchFeedbacks(feedbackPage);
+    } catch (error) {
+      setErrorMsg("피드백 삭제 실패: " + (error as Error).message);
+    } finally {
+      setFeedbackToDelete(null);
+    }
+  };
 
   const handleExpand = async (id: string) => {
     if (expandedId === id) {
@@ -291,51 +343,227 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <select 
-                value={filterCrimeType} 
-                onChange={(e) => setFilterCrimeType(e.target.value)}
-                className="bg-black/50 text-red-400 border border-red-900/50 text-xs p-2 rounded-sm focus:outline-none focus:border-red-500"
-              >
-                <option value="ALL">전체 사건</option>
-                <option value="살인">살인</option>
-                <option value="방화">방화</option>
-                <option value="납치">납치</option>
-                <option value="강도">강도</option>
-                <option value="절도">절도</option>
-              </select>
+              {activeTab === 'SCENARIOS' && (
+                <select
+                  value={filterCrimeType}
+                  onChange={(e) => setFilterCrimeType(e.target.value)}
+                  className="bg-black/50 text-red-400 border border-red-900/50 text-xs p-2 rounded-sm focus:outline-none focus:border-red-500"
+                >
+                  <option value="ALL">전체 사건</option>
+                  <option value="살인">살인</option>
+                  <option value="방화">방화</option>
+                  <option value="납치">납치</option>
+                  <option value="강도">강도</option>
+                  <option value="절도">절도</option>
+                </select>
+              )}
                <span className="text-xs font-mono border-2 border-red-800 px-2 py-1 rounded text-red-600 font-bold bg-red-950/40 transform -rotate-6 opacity-80 hidden md:inline-block">
                 TOP SECRET
               </span>
             </div>
           </div>
 
-          {/* UI Test Bench Controls */}
-          <div className="flex flex-wrap gap-2 items-center bg-black/40 p-2 rounded border border-red-900/30">
-            <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mr-2">
-              <MonitorPlay size={14} /> UI Test Bench:
-            </span>
-            {[
-              { label: 'Intro', type: 'INTRO' },
-              { label: 'Loading', type: 'LOADING' },
-              { label: 'Briefing', type: 'BRIEFING' },
-              { label: 'Investigation', type: 'INVESTIGATION' },
-              { label: 'Deduction', type: 'DEDUCTION' },
-              { label: 'Resolution', type: 'RESOLUTION' },
-            ].map(btn => (
-              <button
-                key={btn.type}
-                onClick={() => prepareTestData(btn.type as TestScreenType)}
-                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] uppercase font-bold rounded-sm border border-gray-600 transition-colors"
-              >
-                {btn.label}
-              </button>
-            ))}
+          {/* Tabs */}
+          <div className="flex gap-2 items-center bg-black/40 p-2 rounded border border-red-900/30">
+            <button
+              onClick={() => setActiveTab('SCENARIOS')}
+              className={`px-3 py-1 text-[11px] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
+                ${activeTab === 'SCENARIOS'
+                  ? 'bg-red-900/40 text-red-300 border-red-700'
+                  : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-gray-200'}
+              `}
+            >
+              <BookOpen size={12} /> 사건 기록
+            </button>
+            <button
+              onClick={() => setActiveTab('FEEDBACKS')}
+              className={`px-3 py-1 text-[11px] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
+                ${activeTab === 'FEEDBACKS'
+                  ? 'bg-red-900/40 text-red-300 border-red-700'
+                  : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-gray-200'}
+              `}
+            >
+              <MessageSquare size={12} /> 플레이어 피드백
+            </button>
           </div>
+
+          {/* UI Test Bench Controls */}
+          {activeTab === 'SCENARIOS' && (
+            <div className="flex flex-wrap gap-2 items-center bg-black/40 p-2 rounded border border-red-900/30">
+              <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mr-2">
+                <MonitorPlay size={14} /> UI Test Bench:
+              </span>
+              {[
+                { label: 'Intro', type: 'INTRO' },
+                { label: 'Loading', type: 'LOADING' },
+                { label: 'Briefing', type: 'BRIEFING' },
+                { label: 'Investigation', type: 'INVESTIGATION' },
+                { label: 'Deduction', type: 'DEDUCTION' },
+                { label: 'Resolution', type: 'RESOLUTION' },
+              ].map(btn => (
+                <button
+                  key={btn.type}
+                  onClick={() => prepareTestData(btn.type as TestScreenType)}
+                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] uppercase font-bold rounded-sm border border-gray-600 transition-colors"
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Content Area */}
         <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar bg-[#111]">
-          {loading ? (
+          {activeTab === 'FEEDBACKS' ? (
+            feedbackLoading ? (
+              <div className="h-full flex flex-col items-center justify-center gap-4">
+                <div className="w-12 h-12 border-4 border-red-900 border-t-red-500 rounded-full animate-spin"></div>
+                <p className="text-center text-sm font-mono text-red-500/80 animate-pulse uppercase tracking-widest">
+                  피드백 로그 열람 중...
+                </p>
+              </div>
+            ) : feedbacks.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-gray-600 gap-2">
+                <MessageSquare size={48} className="opacity-20" />
+                <p className="text-lg">수신된 피드백이 없습니다.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {feedbacks.map((fb) => {
+                  const gr = fb.game_result;
+                  const isExpanded = expandedFeedbackId === fb._id;
+                  const hasDetail = Boolean(
+                    gr && (gr.selectedSuspectName || gr.reasoning || gr.report || gr.advice || gr.culpritName)
+                  );
+                  return (
+                    <div
+                      key={fb._id}
+                      className={`bg-[#202020] rounded-sm border transition-colors
+                        ${isExpanded ? 'border-red-900/50 bg-[#252525]' : 'border-gray-800 hover:border-gray-600'}
+                      `}
+                    >
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-2 flex-wrap min-w-0">
+                            {fb.grade && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider bg-amber-950/40 text-amber-400 border border-amber-900/40">
+                                등급 {fb.grade}
+                              </span>
+                            )}
+                            {gr && typeof gr.isCorrect === 'boolean' && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border
+                                ${gr.isCorrect
+                                  ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/40'
+                                  : 'bg-red-950/40 text-red-400 border-red-900/40'}
+                              `}>
+                                {gr.isCorrect ? '검거 성공' : '검거 실패'}
+                              </span>
+                            )}
+                            <span className="text-xs text-gray-500 font-mono">
+                              {new Date(fb.created_at).toLocaleString('ko-KR')}
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setFeedbackToDelete(fb)}
+                            className="p-1.5 text-red-800 hover:text-red-500 hover:bg-red-950/30 rounded transition-colors shrink-0"
+                            title="피드백 삭제"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+
+                        {(gr?.scenarioTitle || fb.scenario_id) && (
+                          <div className="mt-2 flex items-center gap-2 flex-wrap">
+                            <BookOpen size={12} className="text-gray-500 shrink-0" />
+                            <span className="text-sm font-bold text-gray-200 truncate">
+                              {gr?.scenarioTitle || '제목 정보 없음'}
+                            </span>
+                            {fb.scenario_id && (
+                              <span className="text-[10px] text-gray-600 font-mono">
+                                #{fb.scenario_id}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        <p className="mt-3 text-gray-200 text-sm leading-relaxed whitespace-pre-wrap break-words">
+                          {fb.content}
+                        </p>
+
+                        {hasDetail && (
+                          <button
+                            onClick={() => setExpandedFeedbackId(isExpanded ? null : fb._id)}
+                            className="mt-3 text-[10px] font-mono uppercase tracking-widest text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                            {isExpanded ? '게임 결과 숨기기' : '게임 결과 보기'}
+                          </button>
+                        )}
+                      </div>
+
+                      {isExpanded && gr && (
+                        <div className="border-t border-gray-800 bg-[#151515] p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm animate-slide-down">
+                          <div className="space-y-3">
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1.5">
+                                <User size={12} /> 선택한 용의자
+                              </h4>
+                              <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-gray-200">
+                                {gr.selectedSuspectName || <span className="text-gray-600">-</span>}
+                              </p>
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-bold text-gray-500 uppercase mb-1 flex items-center gap-1.5">
+                                <Gavel size={12} /> 진범
+                              </h4>
+                              <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-red-400">
+                                {gr.culpritName || <span className="text-gray-600">-</span>}
+                              </p>
+                            </div>
+                            {gr.timeTaken && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">소요 시간</h4>
+                                <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-gray-300 font-mono text-xs">
+                                  {gr.timeTaken}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {gr.reasoning && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">추리 내용</h4>
+                                <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-gray-300 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                                  {gr.reasoning}
+                                </p>
+                              </div>
+                            )}
+                            {gr.report && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">종합 평가</h4>
+                                <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-gray-300 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                                  {gr.report}
+                                </p>
+                              </div>
+                            )}
+                            {gr.advice && (
+                              <div>
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">조언 및 놓친 단서</h4>
+                                <p className="bg-[#202020] p-2 rounded-sm border border-gray-800 text-gray-400 whitespace-pre-wrap break-words text-xs italic leading-relaxed">
+                                  {gr.advice}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : loading ? (
             <div className="h-full flex flex-col items-center justify-center gap-4">
               <div className="w-12 h-12 border-4 border-red-900 border-t-red-500 rounded-full animate-spin"></div>
               <p className="text-center text-sm font-mono text-red-500/80 animate-pulse uppercase tracking-widest">
@@ -471,21 +699,43 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
            </button>
 
            <div className="flex items-center gap-4">
-             <button
-               onClick={handlePrevPage}
-               disabled={page === 1}
-               className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
-             >
-               <ArrowLeft size={18} />
-             </button>
-             <span className="font-mono text-gray-500 text-sm">PAGE {page}</span>
-             <button
-               onClick={handleNextPage}
-               disabled={!hasMore}
-               className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
-             >
-               <ArrowRight size={18} />
-             </button>
+             {activeTab === 'SCENARIOS' ? (
+               <>
+                 <button
+                   onClick={handlePrevPage}
+                   disabled={page === 1}
+                   className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                 >
+                   <ArrowLeft size={18} />
+                 </button>
+                 <span className="font-mono text-gray-500 text-sm">PAGE {page}</span>
+                 <button
+                   onClick={handleNextPage}
+                   disabled={!hasMore}
+                   className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                 >
+                   <ArrowRight size={18} />
+                 </button>
+               </>
+             ) : (
+               <>
+                 <button
+                   onClick={() => feedbackPage > 1 && setFeedbackPage(p => p - 1)}
+                   disabled={feedbackPage === 1}
+                   className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                 >
+                   <ArrowLeft size={18} />
+                 </button>
+                 <span className="font-mono text-gray-500 text-sm">PAGE {feedbackPage}</span>
+                 <button
+                   onClick={() => feedbackHasMore && setFeedbackPage(p => p + 1)}
+                   disabled={!feedbackHasMore}
+                   className="p-2 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400 transition-colors"
+                 >
+                   <ArrowRight size={18} />
+                 </button>
+               </>
+             )}
            </div>
         </div>
       </div>
@@ -504,7 +754,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
               <p className="text-gray-400 text-sm font-mono leading-relaxed">
                 정말로 다음 사건 기록을 영구적으로 말소하시겠습니까?
                 <br />
-                <span className="text-white font-bold block mt-2 text-lg">"{scenarioToDelete.title}"</span>
+                <span className="text-white font-bold block mt-2 text-lg">&ldquo;{scenarioToDelete.title}&rdquo;</span>
               </p>
               <div className="bg-red-950/30 border border-red-900/50 p-2 w-full">
                 <p className="text-red-500 text-xs font-bold uppercase tracking-widest text-center">
@@ -531,10 +781,46 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
         </div>
       )}
 
+      {/* Feedback Delete Confirmation Modal */}
+      {feedbackToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-fade-in p-4">
+          <div className="bg-[#1a1a1a] border-2 border-red-800 w-full max-w-md p-6 shadow-2xl relative">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="bg-red-900/20 p-3 rounded-full animate-pulse">
+                <Trash2 size={32} className="text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-red-500 font-mono tracking-wider uppercase">
+                피드백 삭제
+              </h3>
+              <p className="text-gray-400 text-sm font-mono leading-relaxed">
+                이 피드백을 영구적으로 삭제하시겠습니까?
+              </p>
+              <p className="text-gray-300 text-sm bg-black/40 p-3 w-full border border-gray-800 rounded-sm whitespace-pre-wrap break-words text-left">
+                {feedbackToDelete.content}
+              </p>
+              <div className="flex gap-4 w-full mt-2">
+                <button
+                  onClick={() => setFeedbackToDelete(null)}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleConfirmDeleteFeedback}
+                  className="flex-1 bg-red-900 hover:bg-red-800 text-white py-3 rounded-sm font-mono text-sm uppercase tracking-wider transition-colors shadow-lg shadow-red-900/20"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ErrorModal
         errorMsg={errorMsg}
         setErrorMsg={setErrorMsg}
-        onRetry={() => fetchScenarios(page)}
+        onRetry={() => activeTab === 'FEEDBACKS' ? fetchFeedbacks(feedbackPage) : fetchScenarios(page)}
       />
 
       <style jsx>{`
