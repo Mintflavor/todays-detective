@@ -58,9 +58,9 @@ export default function DeductionScreen({
               >
                 <div className="w-full aspect-square bg-gray-800 mb-2 rounded-full overflow-hidden flex items-center justify-center group-hover:scale-105 transition-transform relative border border-gray-600">
                   {s.portraitImage ? (
-                    <Image 
-                      src={`data:image/jpeg;base64,${s.portraitImage}`} 
-                      alt={s.name} 
+                    <Image
+                      src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
+                      alt={s.name}
                       fill
                       className="object-cover"
                     />

@@ -222,7 +222,7 @@ export default function InvestigationScreen({
                   <div className="relative w-8 h-8 rounded-full overflow-hidden flex items-center justify-center bg-gray-800 border border-gray-600">
                     {s.portraitImage ? (
                       <Image 
-                        src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                        src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
                         alt={s.name} 
                         fill
                         className={`object-cover ${currentSuspectId === s.id ? "opacity-100" : "opacity-70 grayscale"}`}

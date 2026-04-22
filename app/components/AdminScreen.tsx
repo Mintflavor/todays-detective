@@ -1,22 +1,32 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BookOpen, Trash2, XCircle, ChevronDown, ChevronUp, User, Skull, Gavel, ArrowLeft, ArrowRight } from 'lucide-react';
+import { BookOpen, Trash2, XCircle, ChevronDown, ChevronUp, User, Skull, Gavel, ArrowLeft, ArrowRight, MonitorPlay, X } from 'lucide-react';
 import { getScenarios, deleteScenario, getScenarioDetail, ScenarioListItem } from '../lib/api';
-import { CaseData } from '../types/game';
+import { CaseData, ChatLogs, Evaluation, DeductionInput } from '../types/game';
 import ErrorModal from './ErrorModal';
+import IntroScreen from './IntroScreen';
+import LoadingScreen from './LoadingScreen';
+import BriefingScreen from './BriefingScreen';
+import InvestigationScreen from './InvestigationScreen';
+import DeductionScreen from './DeductionScreen';
+import ResolutionScreen from './ResolutionScreen';
 
 interface AdminScreenProps {
   onExit: () => void;
 }
 
+type TestScreenType = 'NONE' | 'INTRO' | 'LOADING' | 'BRIEFING' | 'INVESTIGATION' | 'DEDUCTION' | 'RESOLUTION';
+
 export default function AdminScreen({ onExit }: AdminScreenProps) {
+  // Data State
   const [scenarios, setScenarios] = useState<ScenarioListItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [scenarioToDelete, setScenarioToDelete] = useState<{ id: string, title: string } | null>(null);
   
-  // Pagination
+  // Filter & Pagination
+  const [filterCrimeType, setFilterCrimeType] = useState<string>("ALL");
   const [page, setPage] = useState<number>(1);
   const ITEMS_PER_PAGE = 10;
   const [hasMore, setHasMore] = useState<boolean>(true);
@@ -26,13 +36,26 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
   const [detailData, setDetailData] = useState<CaseData | null>(null);
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
 
+  // UI Test State
+  const [testScreen, setTestScreen] = useState<TestScreenType>('NONE');
+  const [testCaseData, setTestCaseData] = useState<CaseData | null>(null);
+  const [testLoading, setTestLoading] = useState<boolean>(false);
+
+  // Mock States for Investigation Test
+  const [mockCurrentSuspectId, setMockCurrentSuspectId] = useState<number>(0);
+  const [mockChatLogs, setMockChatLogs] = useState<ChatLogs>({ 0: [], 1: [], 2: [], 3: [] });
+  const [mockUserInput, setMockUserInput] = useState<string>("");
+  const [mockIsTyping, setMockIsTyping] = useState<boolean>(false);
+
+  // Mock States for Deduction Test
+  const [mockDeductionInput, setMockDeductionInput] = useState<DeductionInput>({ culpritId: null, reasoning: "" });
+
   const fetchScenarios = async (pageNum: number) => {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const fetchedScenarios = await getScenarios(pageNum, ITEMS_PER_PAGE);
+      const fetchedScenarios = await getScenarios(pageNum, ITEMS_PER_PAGE, filterCrimeType);
       setScenarios(fetchedScenarios);
-      // 만약 가져온 개수가 페이지당 개수보다 적으면 더 이상 페이지가 없는 것으로 간주
       setHasMore(fetchedScenarios.length === ITEMS_PER_PAGE);
     } catch (error) {
       setErrorMsg("사건 목록을 불러오는데 실패했습니다: " + (error as Error).message);
@@ -42,7 +65,12 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
   };
 
   useEffect(() => {
-    fetchScenarios(page);
+    setPage(1); // Reset page on filter change
+    fetchScenarios(1);
+  }, [filterCrimeType]);
+
+  useEffect(() => {
+    if (page > 1) fetchScenarios(page);
   }, [page]);
 
   const handleExpand = async (id: string) => {
@@ -54,31 +82,29 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
 
     setExpandedId(id);
     setDetailLoading(true);
-    setDetailData(null); // Clear previous data
+    setDetailData(null);
 
     try {
       const data = await getScenarioDetail(id);
       setDetailData(data);
     } catch (error) {
       setErrorMsg("상세 정보를 불러오는데 실패했습니다: " + (error as Error).message);
-      setExpandedId(null); // Close on error
+      setExpandedId(null);
     } finally {
       setDetailLoading(false);
     }
   };
 
   const handleInitiateDelete = (e: React.MouseEvent, id: string, title: string) => {
-    e.stopPropagation(); // Prevent row expansion
+    e.stopPropagation();
     setScenarioToDelete({ id, title });
   };
 
   const handleConfirmDelete = async () => {
     if (!scenarioToDelete) return;
-
     setErrorMsg(null);
     try {
       await deleteScenario(scenarioToDelete.id);
-      // Refresh current page
       fetchScenarios(page);
     } catch (error) {
       setErrorMsg("사건 기록 말소 실패: " + (error as Error).message);
@@ -103,6 +129,149 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
     if (hasMore) setPage(p => p + 1);
   };
 
+  // UI Testing Logic
+  const prepareTestData = async (screenName: TestScreenType) => {
+    if (screenName === 'INTRO' || screenName === 'LOADING') {
+      setTestScreen(screenName);
+      return;
+    }
+
+    if (scenarios.length === 0) {
+      setErrorMsg("테스트할 시나리오가 없습니다. 먼저 사건을 생성해주세요.");
+      return;
+    }
+
+    setTestLoading(true);
+    try {
+      // Use the first available scenario for testing
+      const targetId = scenarios[0]._id;
+      const data = await getScenarioDetail(targetId);
+      setTestCaseData(data);
+      
+      // Initialize mocks based on data
+      const initialLogs: ChatLogs = { 0: [], 1: [], 2: [], 3: [] };
+      
+      const worldInfoMsg = { 
+        role: 'system' as const, // Explicitly cast to 'system' | 'user' | 'ai' | 'note'
+        text: `[현장 정보] ${data.world_setting.location}\n[날씨] ${data.world_setting.weather}` 
+      };
+
+      initialLogs[0] = [{ role: 'system', text: '수사 수첩입니다. 이곳에 자유롭게 메모를 남기세요. (AP 소모 없음)' }];
+      
+      data.suspects.forEach(s => {
+          initialLogs[s.id] = [worldInfoMsg];
+      });
+
+      setMockChatLogs(initialLogs);
+      setMockCurrentSuspectId(0);
+      setMockDeductionInput({ culpritId: null, reasoning: "" });
+      
+      setTestScreen(screenName);
+    } catch (error) {
+      setErrorMsg("테스트 데이터를 불러오는데 실패했습니다.");
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
+  const renderTestScreen = () => {
+    if (!testScreen || testScreen === 'NONE') return null;
+
+    const exitButton = (
+      <button 
+        onClick={() => setTestScreen('NONE')}
+        className="fixed top-4 right-4 z-[100] bg-red-600 text-white p-2 rounded-full shadow-xl hover:bg-red-700 transition-colors border-2 border-white"
+        title="테스트 종료"
+      >
+        <X size={24} />
+      </button>
+    );
+
+    // Add overlay for exit button context
+    const withExit = (component: React.ReactNode) => (
+      <div className="relative w-full h-full">
+        {exitButton}
+        {component}
+      </div>
+    );
+
+    switch (testScreen) {
+      case 'INTRO':
+        return withExit(<IntroScreen onStart={() => alert("Start Clicked")} onLoadGame={() => alert("Load Clicked")} isMuted={false} toggleMute={() => {}} />);
+      case 'LOADING':
+        return withExit(<LoadingScreen loadingText="테스트 로딩 중..." />);
+      case 'BRIEFING':
+        return testCaseData ? withExit(<BriefingScreen caseData={testCaseData} onStartInvestigation={() => alert("Start Investigation")} />) : null;
+      case 'INVESTIGATION':
+        return testCaseData ? withExit(
+          <InvestigationScreen 
+            caseData={testCaseData}
+            currentSuspectId={mockCurrentSuspectId}
+            setCurrentSuspectId={setMockCurrentSuspectId}
+            chatLogs={mockChatLogs}
+            actionPoints={5}
+            timerSeconds={600}
+            isOverTime={false}
+            showTimeOverModal={false}
+            closeTimeOverModal={() => {}}
+            userInput={mockUserInput}
+            handleInputChange={(e) => setMockUserInput(e.target.value)}
+            handleKeyDown={(e) => { if(e.key === 'Enter') { setMockUserInput(""); alert("Message Sent (Mock)"); }}}
+            handleSendMessage={() => { setMockUserInput(""); alert("Message Sent (Mock)"); }}
+            inputPlaceholder="질문을 입력하세요..."
+            isTyping={mockIsTyping}
+            isMuted={false}
+            toggleMute={() => {}}
+            onGoToBriefing={() => alert("Go to Briefing")}
+            onGoToDeduction={() => alert("Go to Deduction")}
+          />
+        ) : null;
+      case 'DEDUCTION':
+        return testCaseData ? withExit(
+          <DeductionScreen 
+            caseData={testCaseData} 
+            deductionInput={mockDeductionInput} 
+            setDeductionInput={setMockDeductionInput} 
+            onSubmit={() => alert("Submit Deduction")} 
+            onBack={() => setTestScreen('NONE')} 
+          />
+        ) : null;
+      case 'RESOLUTION':
+        return testCaseData ? withExit(
+          <ResolutionScreen 
+            caseData={testCaseData} 
+            evaluation={{
+              isCorrect: true,
+              grade: "S",
+              report: "탐정은 놀라운 추리력으로 사건의 진상을 완벽하게 파악했습니다.",
+              advice: "특별히 조언할 점이 없습니다.",
+              culpritName: "테스트 범인",
+              truth: "이것은 테스트용 진상입니다.",
+              timeTaken: "05:00",
+              culpritImage: testCaseData.suspects[0]?.portraitImage,
+              caseNumber: "TEST-001"
+            }} 
+            onReset={() => setTestScreen('NONE')} 
+          />
+        ) : null;
+      default:
+        return null;
+    }
+  };
+
+  if (testScreen !== 'NONE') {
+    return (
+      <div className="fixed inset-0 z-[200] bg-black overflow-y-auto">
+        {testLoading ? (
+          <div className="flex h-full items-center justify-center text-white">
+            <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+            테스트 데이터 로딩 중...
+          </div>
+        ) : renderTestScreen()}
+      </div>
+    );
+  }
+
   return (
     <div 
       className="flex flex-col items-center justify-center min-h-screen bg-black/95 p-4 md:p-6 relative"
@@ -110,20 +279,57 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
     >
       <div className="w-full max-w-4xl bg-[#1a1a1a] text-gray-300 rounded-sm shadow-2xl overflow-hidden relative border border-gray-800 animate-fade-in flex flex-col h-[85vh]">
         {/* Header */}
-        <div className="bg-red-900/20 text-red-500 p-4 border-b border-red-900/50 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <BookOpen size={24} />
-            <div>
-              <h2 className="font-mono font-bold text-xl md:text-2xl tracking-widest uppercase text-gray-200">
-                제한 구역
-              </h2>
-              <p className="text-[10px] text-red-400/60 uppercase tracking-widest">Authorized Personnel Only</p>
+        <div className="bg-red-900/20 text-red-500 p-4 border-b border-red-900/50 flex flex-col gap-4 shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <BookOpen size={24} />
+              <div>
+                <h2 className="font-mono font-bold text-xl md:text-2xl tracking-widest uppercase text-gray-200">
+                  제한 구역
+                </h2>
+                <p className="text-[10px] text-red-400/60 uppercase tracking-widest">Authorized Personnel Only</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <select 
+                value={filterCrimeType} 
+                onChange={(e) => setFilterCrimeType(e.target.value)}
+                className="bg-black/50 text-red-400 border border-red-900/50 text-xs p-2 rounded-sm focus:outline-none focus:border-red-500"
+              >
+                <option value="ALL">전체 사건</option>
+                <option value="살인">살인</option>
+                <option value="방화">방화</option>
+                <option value="납치">납치</option>
+                <option value="강도">강도</option>
+                <option value="절도">절도</option>
+              </select>
+               <span className="text-xs font-mono border-2 border-red-800 px-2 py-1 rounded text-red-600 font-bold bg-red-950/40 transform -rotate-6 opacity-80 hidden md:inline-block">
+                TOP SECRET
+              </span>
             </div>
           </div>
-          <div className="flex flex-col items-end">
-             <span className="text-xs font-mono border-2 border-red-800 px-2 py-1 rounded text-red-600 font-bold bg-red-950/40 transform -rotate-6 opacity-80">
-              TOP SECRET
+
+          {/* UI Test Bench Controls */}
+          <div className="flex flex-wrap gap-2 items-center bg-black/40 p-2 rounded border border-red-900/30">
+            <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1 mr-2">
+              <MonitorPlay size={14} /> UI Test Bench:
             </span>
+            {[
+              { label: 'Intro', type: 'INTRO' },
+              { label: 'Loading', type: 'LOADING' },
+              { label: 'Briefing', type: 'BRIEFING' },
+              { label: 'Investigation', type: 'INVESTIGATION' },
+              { label: 'Deduction', type: 'DEDUCTION' },
+              { label: 'Resolution', type: 'RESOLUTION' },
+            ].map(btn => (
+              <button
+                key={btn.type}
+                onClick={() => prepareTestData(btn.type as TestScreenType)}
+                className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] uppercase font-bold rounded-sm border border-gray-600 transition-colors"
+              >
+                {btn.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -140,6 +346,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             <div className="h-full flex flex-col items-center justify-center text-gray-600 gap-2">
               <XCircle size={48} className="opacity-20" />
               <p className="text-lg">데이터가 존재하지 않습니다.</p>
+              {filterCrimeType !== "ALL" && <p className="text-sm">필터 조건을 변경해보세요.</p>}
             </div>
           ) : (
             <div className="space-y-3">

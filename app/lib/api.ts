@@ -10,30 +10,14 @@ export interface ScenarioListItem {
   created_at: string;
 }
 
-export async function saveScenario(caseData: CaseData) {
-  // Use local API route to proxy request and avoid CORS/Redirect issues
-  const response = await fetch(`/api/scenarios`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      title: caseData.title,
-      summary: caseData.summary,
-      crime_type: caseData.crime_type,
-      case_data: caseData,
-    }),
-  });
 
-  if (!response.ok) {
-    throw new Error("Failed to save scenario");
+
+export async function getScenarios(page: number = 1, limit: number = 10, crimeType?: string): Promise<ScenarioListItem[]> {
+  let url = `${API_BASE_URL}/scenarios/?page=${page}&limit=${limit}`;
+  if (crimeType && crimeType !== "ALL") {
+    url += `&crime_type=${encodeURIComponent(crimeType)}`;
   }
-
-  return response.json();
-}
-
-export async function getScenarios(page: number = 1, limit: number = 10): Promise<ScenarioListItem[]> {
-  const response = await fetch(`${API_BASE_URL}/scenarios/?page=${page}&limit=${limit}`);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to fetch scenarios");
   }

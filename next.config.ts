@@ -3,6 +3,14 @@ import type { NextConfig } from "next";
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'todays-detective.s3.ap-northeast-2.amazonaws.com',
+      },
+    ],
+  },
   async rewrites() {
     return [
       {

@@ -95,8 +95,8 @@ export default function BriefingScreen({ caseData, onStartInvestigation }: Brief
                   <div key={s.id} className="flex items-center gap-4 bg-black/5 p-4 rounded-sm border border-black/10 hover:bg-black/10 transition-colors">
                     <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center shrink-0 border border-gray-400 overflow-hidden relative">
                       {s.portraitImage ? (
-                        <Image 
-                          src={`data:image/jpeg;base64,${s.portraitImage}`} 
+                        <Image
+                          src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
                           alt={s.name}
                           fill
                           className="object-cover"
