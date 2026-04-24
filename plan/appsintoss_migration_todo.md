@@ -82,25 +82,26 @@
 - [x] 5.7 `DeductionScreen`
 - [x] 5.8 `ResolutionScreen` (Briefing/Feedback 서브모달 포함)
 
-### Step 5-c
-- [ ] 5.6 `InvestigationScreen`
+### Step 5-c ✅
+- [x] 5.6 `InvestigationScreen` — Emotion + noir 테마, 타임오버 모달/탭/채팅 버블/타이핑 인디케이터 포함
 
-### Step 5-d
-- [ ] 5.2 `LoadScenarioScreen`
-- [ ] 5.11 `AssetPreloader`
-- [ ] `App.tsx` 페이즈 라우팅 연결
+### Step 5-d ✅
+- [x] 5.2 `LoadScenarioScreen` — Emotion + noir, FastAPI 직접 호출, 필터/페이지네이션
+- [x] 5.11 `AssetPreloader` — `public/images/*.webp` 프리로드 (`import.meta.env.BASE_URL` 기준)
+- [x] `App.tsx` 페이즈 라우팅 연결 — 기존 템플릿 제거, `useGameEngine` 기반 라우팅 + `AssetPreloader` + BGM `<audio>` 포함
+- [x] (추가) 정적 리소스 복사 — `public/bgm/Cold_Coffee_at_Three_compressed.mp3`, `public/images/*.webp` 4종
 
 ### 제외 (Step 1 결정)
 - ~~5.9 `AdminAuthModal`, `AdminScreen`~~ — 미니앱에서 제외
 
-## Step 6. 앱인토스 네이티브 기능 통합 📱
-- [ ] 6.1 상단 네비게이션 바 설정 (브랜딩 가이드 준수)
-- [ ] 6.2 Safe Area 적용
-- [ ] 6.3 뒤로가기 이벤트 처리 (`useBackEvent`)
-- [ ] 6.4 화면 꺼짐 방지 (`setScreenAwakeMode`) — 투자 중 필요 시
-- [ ] 6.5 결과 공유 기능 (`share` 또는 `getTossShareLink`)
-- [ ] 6.6 사용자 식별키 (`getUserKeyForGame` or `getAnonymousKey`)
-- [ ] 6.7 Analytics 연동 (`Analytics.init`, `LoggingPress` 등)
+## Step 6. 앱인토스 네이티브 기능 통합 📱 ✅
+- [x] 6.1 상단 네비게이션 바 설정 — `granite.config.ts`에 `webViewProps.type: "game"` 추가 (투명 배경 + X 버튼 자동 제공)
+- [x] 6.2 Safe Area 적용 — `useSafeArea` 훅 작성, `InvestigationScreen` 헤더/하단 영역에 반영 (X 버튼 겹침 방지용 우측 여유 포함)
+- [x] 6.3 뒤로가기 이벤트 처리 — `useBackHandler` 훅 작성, `App.tsx`에서 페이즈별 라우팅 정의
+- [x] 6.4 화면 꺼짐 방지 — `useScreenAwake` 훅 작성, `investigation` 페이즈에서만 활성화 + 언마운트 시 복구
+- [x] 6.5 결과 공유 — `shareResolution` 유틸 작성, `ResolutionScreen`에 "📤 수사 결과 공유하기" 버튼 추가
+- [x] 6.6 사용자 식별키 — `fetchGameUserKey()` (`getUserKeyForGame` 래퍼) 부팅 시 호출, `sessionStorage.td_userKey`에 캐시 (Step 7에서 백엔드 payload에 동봉 예정)
+- [x] 6.7 Analytics 연동 — `initAnalyticsOnce()` 작성, `App.tsx` 마운트 시 1회 호출 (샌드박스/웹에서는 no-op)
 
 ## Step 7. 백엔드 연동 확정 🔌
 - [ ] 7.1 백엔드 배포 / 엔드포인트 URL 확정

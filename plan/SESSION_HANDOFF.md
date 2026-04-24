@@ -3,8 +3,8 @@
 작성자 : 박현일
 이 문서의 소유권은 작성자에게 있으며, 일부 또는 전체는 AI(Claude)를 활용하여 작성되었습니다.
 
-**마지막 업데이트**: Step 5-b 완료 시점
-**다음 작업**: Step 5-c (`InvestigationScreen` 마이그레이션)
+**마지막 업데이트**: Step 6 완료 시점
+**다음 작업**: Step 7 (백엔드 연동 확정)
 
 ---
 
@@ -18,10 +18,10 @@
 | Step 4 | 게임 엔진 훅 이식 | ✅ 완료 |
 | **Step 5-a** | Intro, Loading, Error, Tutorial 화면 | ✅ 완료 |
 | **Step 5-b** | Briefing, Deduction, Resolution 화면 | ✅ 완료 |
-| **Step 5-c** | **InvestigationScreen 화면** | ⏳ **다음 작업** |
-| Step 5-d | LoadScenarioScreen, AssetPreloader, App.tsx 라우팅 | ⏳ 대기 |
-| Step 6 | 앱인토스 네이티브 기능 통합 | ⏳ 대기 |
-| Step 7 | 백엔드 연동 확정 | ⏳ 대기 |
+| **Step 5-c** | InvestigationScreen 화면 | ✅ 완료 |
+| **Step 5-d** | LoadScenarioScreen, AssetPreloader, App.tsx 라우팅 | ✅ 완료 |
+| **Step 6** | 앱인토스 네이티브 기능 통합 | ✅ 완료 |
+| **Step 7** | **백엔드 연동 확정** | ⏳ **다음 작업** |
 | Step 8 | 테스트 및 최적화 | ⏳ 대기 |
 | Step 9 | 출시 준비 | ⏳ 대기 |
 
@@ -77,7 +77,7 @@ E:\Documents\ktds\todays-detective-appsintoss\
 ├── .env.example             # ✅ VITE_API_BASE_URL, VITE_FASTAPI_BASE_URL
 ├── src/
 │   ├── main.tsx             # ✅ TDSMobileAITProvider 래핑 (템플릿 기본)
-│   ├── App.tsx              # ⏳ Step 5-d에서 라우팅 연결 예정
+│   ├── App.tsx              # ✅ Step 5-d — useGameEngine 페이즈 라우팅
 │   ├── vite-env.d.ts        # ✅ ImportMetaEnv 타입 확장
 │   ├── styles/
 │   │   └── theme.ts         # ✅ noir 색상/폰트 토큰
@@ -102,9 +102,12 @@ E:\Documents\ktds\todays-detective-appsintoss\
 │       ├── BriefingScreen.tsx    # ✅ Step 5-b
 │       ├── DeductionScreen.tsx   # ✅ Step 5-b
 │       ├── ResolutionScreen.tsx  # ✅ Step 5-b (내부 Briefing/Feedback 모달 포함)
-│       ├── InvestigationScreen.tsx # ⏳ Step 5-c (다음 작업)
-│       ├── LoadScenarioScreen.tsx  # ⏳ Step 5-d
-│       └── AssetPreloader.tsx      # ⏳ Step 5-d
+│       ├── InvestigationScreen.tsx # ✅ Step 5-c
+│       ├── LoadScenarioScreen.tsx  # ✅ Step 5-d
+│       └── AssetPreloader.tsx      # ✅ Step 5-d
+├── public/
+│   ├── bgm/Cold_Coffee_at_Three_compressed.mp3  # ✅ Step 5-d 복사
+│   └── images/*.webp (4종)                       # ✅ Step 5-d 복사
 └── docs/skills/             # 참조 문서 (apps-in-toss.md, tds-mobile.md)
 ```
 
