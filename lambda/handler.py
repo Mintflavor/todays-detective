@@ -8,7 +8,9 @@ import json
 import logging
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
+
+# 초상화 병렬 생성 비활성화로 ThreadPoolExecutor는 현재 미사용. 복원 시 다음 import도 함께 복원.
+# from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -71,54 +73,47 @@ def _sanitize_case_data(case_data):
 
 # --- Game endpoints (lazy imports so /scenarios, /feedbacks stay lightweight) ---
 def _game_start(body):
-    from gemini_client import call_gemini, generate_image
-    from prompts import CASE_GENERATION_PROMPT, generate_portrait_prompt
-    from s3_upload import upload_portrait
-
-    raw = call_gemini(CASE_GENERATION_PROMPT)
-    cleaned = raw.replace("```json", "").replace("```", "").strip()
-    try:
-        case_data = json.loads(cleaned)
-    except json.JSONDecodeError as exc:
-        logger.error("JSON parse failed: %s", exc)
-        return response(500, {"detail": "Failed to parse generated case data"})
-
-    # 초상화 병렬 생성 — 실패 시 조용히 스킵(클라이언트는 아이콘 fallback)
-    suspects = case_data.get("suspects", [])
-
-    def _generate_one(suspect):
-        try:
-            prompt = generate_portrait_prompt(suspect)
-            raw_bytes = generate_image(prompt)
-            url = upload_portrait(raw_bytes)
-            suspect["portraitImage"] = url
-        except Exception as exc:
-            logger.warning(
-                "Portrait generation failed for suspect %s: %s",
-                suspect.get("id"),
-                exc,
-            )
-
-    if suspects:
-        with ThreadPoolExecutor(max_workers=min(len(suspects), 3)) as ex:
-            list(ex.map(_generate_one, suspects))
-
-    # Atlas 저장
+    # API Gateway 30초 timeout 회피를 위해 Gemini로 새 시나리오를 생성하는 대신
+    # DB에 저장된 기존 시나리오를 랜덤으로 1건 반환한다.
+    # (평가 시점엔 scenarioId로 원본 doc을 다시 읽어 정답 확인이 가능하므로 재사용해도 무방)
+    #
+    # 클라이언트가 보낸 excludeIds는 최근 플레이한 시나리오 _id 목록이며,
+    # 가능한 한 새로운 시나리오를 뽑기 위해 $match에서 제외한다.
+    # 모든 시나리오가 제외되어 결과가 0건이면 제외 없이 다시 랜덤한다.
     col = get_collection()
-    doc = {
-        "title": case_data.get("title", ""),
-        "summary": case_data.get("summary", ""),
-        "crime_type": case_data.get("crime_type") or "Unknown",
-        "case_data": case_data,
-        "created_at": datetime.now(timezone.utc),
-    }
-    result = col.insert_one(doc)
-    scenario_id = str(result.inserted_id)
+
+    exclude_ids = []
+    raw_exclude = body.get("excludeIds") or []
+    if isinstance(raw_exclude, list):
+        for sid in raw_exclude:
+            try:
+                exclude_ids.append(ObjectId(sid))
+            except Exception:
+                continue
+
+    base_match = {"case_data": {"$exists": True, "$ne": None}}
+
+    def _sample_with_match(match):
+        return list(col.aggregate([{"$match": match}, {"$sample": {"size": 1}}]))
+
+    docs = []
+    if exclude_ids:
+        match = {**base_match, "_id": {"$nin": exclude_ids}}
+        docs = _sample_with_match(match)
+    if not docs:
+        docs = _sample_with_match(base_match)
+    if not docs:
+        return response(500, {"detail": "No scenarios available"})
+
+    doc = docs[0]
+    case_data = doc.get("case_data") or {}
+    if not case_data:
+        return response(500, {"detail": "Invalid scenario data"})
 
     return response(
         200,
         {
-            "scenarioId": scenario_id,
+            "scenarioId": str(doc["_id"]),
             "caseData": _sanitize_case_data(case_data),
         },
     )

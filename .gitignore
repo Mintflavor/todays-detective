@@ -46,3 +46,6 @@ next-env.d.ts
 # AWS Lambda build artifacts
 /lambda/package/
 /lambda/function.zip
+/lambda/package_min/
+/lambda/function_min.zip
+

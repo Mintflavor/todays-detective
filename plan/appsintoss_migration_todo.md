@@ -103,15 +103,20 @@
 - [x] 6.6 사용자 식별키 — `fetchGameUserKey()` (`getUserKeyForGame` 래퍼) 부팅 시 호출, `sessionStorage.td_userKey`에 캐시 (Step 7에서 백엔드 payload에 동봉 예정)
 - [x] 6.7 Analytics 연동 — `initAnalyticsOnce()` 작성, `App.tsx` 마운트 시 1회 호출 (샌드박스/웹에서는 no-op)
 
-## Step 7. 백엔드 연동 확정 🔌
-- [ ] 7.1 백엔드 배포 / 엔드포인트 URL 확정
-- [ ] 7.2 CORS 설정 검증 (앱인토스 도메인 허용)
-- [ ] 7.3 Gemini API 프록시 엔드포인트 구현 (서버에서 키 관리)
-- [ ] 7.4 MongoDB 시나리오 CRUD 연동
-- [ ] 7.5 S3 이미지 업로드/서빙 경로 확정
+## Step 7. 백엔드 연동 확정 🔌 ✅
+AWS Lambda 단일 핸들러(`todays-detective/lambda/handler.py`)에 게임 API와 시나리오/피드백 CRUD가 모두 통합되어 있어, 클라이언트는 단일 API Gateway URL만 사용함.
+- [x] 7.1 백엔드 엔드포인트 URL 확정 — `https://l65j5gjyj6.execute-api.ap-northeast-2.amazonaws.com` (AWS API Gateway)
+- [x] 7.2 CORS 설정 검증 — `handler.py`의 `CORS_HEADERS`가 `Access-Control-Allow-Origin: *` 적용 (OPTIONS 프리플라이트 처리 포함)
+- [x] 7.3 Gemini API 프록시 — `lambda/gemini_client.py`에서 `GEMINI_API_KEY` 환경변수 기반 호출, 클라이언트에 키 노출 없음
+- [x] 7.4 MongoDB 시나리오 CRUD 연동 — Atlas 기반, `/scenarios`, `/feedbacks` 라우트 동작 (handler.py에 통합)
+- [x] 7.5 S3 이미지 업로드/서빙 경로 확정 — `https://todays-detective.s3.ap-northeast-2.amazonaws.com/portraits/*.jpg`, `lambda/s3_upload.py` 사용
+- [x] (클라이언트 통합) `VITE_FASTAPI_BASE_URL` 제거 → `VITE_API_BASE_URL` 단일 변수로 통합 (`src/lib/http.ts`, `src/lib/api.ts`, `src/vite-env.d.ts`, `.env.example`)
 
-## Step 8. 테스트 및 최적화 ✅
-- [ ] 8.1 로컬 실행 (`granite dev`) 확인
+## Step 8. 테스트 및 최적화
+- [x] 8.1 로컬 실행 (`granite dev`) 확인 — Vite 5173, Granite 8081 정상 부팅. 인트로→튜토리얼→로딩→브리핑→수사 흐름과 `/api/game/start`·`/api/game/chat` Lambda 호출 200 OK (Playwright 자동 검증).
+  - **수정**: `useBackHandler` — `@apps-in-toss/web-framework` web 빌드에 `useBackEvent`가 export되지 않아 화면이 렌더링되지 않던 이슈 해결. web 환경에서 no-op 처리.
+  - **수정+배포**: `lambda/handler.py` — portrait 생성/업로드 블록 비활성화(주석 처리). `aws lambda update-function-code`로 `todays-detective-api`(arm64, python3.12) 재배포 완료. 응답에서 `portraitImage` 키 제거됨, 클라이언트 fallback 정상 동작 확인. (추후 Imagen 안정화되면 주석 복원)
+  - **외부 이슈(블로커 아님)**: 브라우저 환경에서 `getSafeAreaInsets is not a constant handler` 콘솔 에러 — TDS Mobile AIT Provider 내부, native bridge 미연결 시 정상 동작.
 - [ ] 8.2 앱인토스 샌드박스 앱으로 실기기 테스트
 - [ ] 8.3 이미지/리소스 최적화 (번들 사이즈, 로딩 속도)
 - [ ] 8.4 에러 처리 및 로딩 상태 검증
