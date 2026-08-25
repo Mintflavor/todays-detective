@@ -416,7 +416,7 @@ unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상�
 | ~~**2-C**~~ | ✅ 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
 | ~~**2-D**~~ | ✅ 게임 라우터 — `routers/game.py` 5개 엔드포인트 (통합 검증 완료) | 2.4 |
 | ~~**2-E**~~ | ✅ CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
-| **2-F** | 회귀 테스트 — pytest 3종 + 컨테이너 기동 검증 | 2.8 |
+| ~~**2-F**~~ | ✅ 회귀 테스트 — pytest 158건 통과 | 2.8 |
 
 새 디렉터리 `server/`를 만들고 `lambda/`의 검증된 로직을 이식한다.
 
@@ -537,7 +537,43 @@ FastAPI는 422를 반환한다.
 라우터 3개에 `TODO(Phase 5.2)` 주석으로 인증이 필요한 지점을 표시했다
 (`POST /scenarios`, `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`).
 - [ ] 2.7 `Dockerfile` — `python:3.12-slim`, non-root 유저, `uvicorn --host 0.0.0.0 --port 8000`
-- [ ] 2.8 **pytest 회귀 테스트** — 최소 3종: 스포일러 정화 / 평가 정규식 파싱 / 피드백 필드 매핑. 정식 재작성을 택했으므로 사실상 필수다
+- [x] 2.8 **pytest 회귀 테스트 — 158건 전부 통과** (§2-F)
+
+#### §2-F. Phase 2-F 결과
+
+```
+tests/test_evaluate_parsing.py   25건
+tests/test_feedback_mapping.py   28건
+tests/test_routes.py             47건
+tests/test_sanitize.py           42건
+tests/test_storage.py            16건
+                                158건 통과 (2.4초)
+```
+
+**Dockerfile을 멀티스테이지로 전환했다.** 기본(마지막) 스테이지가 `runtime`이라 compose는
+target 지정 없이 운영 이미지를 빌드하고, `--target test`로 pytest 스테이지를 따로 만든다.
+운영 이미지에 pytest가 없음을 확인했다.
+
+**테스트가 지키는 두 안전장치**
+
+1. **Gemini 호출 0회** — `block_gemini`가 autouse로 `call_gemini`·`generate_portrait_image`·
+   `get_client`를 예외 발생 함수로 교체한다. 실수로 실제 호출이 새면 즉시 실패하므로
+   테스트가 비용을 발생시키지 않는다
+2. **운영 데이터 무손상** — 앱 계정은 `todays_detective` DB에만 권한이 있어 별도 DB를 쓸 수
+   없다. 같은 DB의 `scenarios_pytest`/`feedbacks_pytest` 컬렉션을 쓰고 매 테스트마다 비운다.
+   실행 후 운영 컬렉션이 그대로임을 확인했다 (scenarios 1건 유지)
+
+**작업 중 만난 함정 3건**
+
+| 문제 | 원인 | 해결 |
+|---|---|---|
+| `ModuleNotFoundError: app` | pytest가 테스트 파일의 basedir(`/app/tests`)만 sys.path에 넣는다 | `pytest.ini`에 `pythonpath = .` |
+| 별도 테스트 DB 접근 거부 | 앱 계정은 `todays_detective`에만 `readWrite` | 같은 DB의 전용 컬렉션으로 전환 |
+| `Cannot use MongoClient after close` | `TestClient` 컨텍스트 종료 시 lifespan이 `db.close()`를 호출 → 이후 정리 코드가 닫힌 핸들 사용 | 정리 시점에 `db.get_db()`로 핸들 재취득 |
+
+`starlette.testclient`가 `httpx` 대신 **`httpx2`**를 요구하므로 dev 의존성을 교체했다.
+
+Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제거했다.
 
 ### Phase 3 — Next.js 컨테이너화
 

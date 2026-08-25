@@ -9,4 +9,5 @@
 -r requirements.txt
 
 pytest==9.1.1
-httpx==0.28.1
+# starlette.testclient가 httpx2를 권장한다 (httpx 사용 시 DeprecationWarning)
+httpx2==2.12.0

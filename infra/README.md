@@ -13,11 +13,15 @@ Today's Detective를 unraid에서 구동하는 Docker Compose 스택. 전체 이
 | `docker-compose.yml` | `/mnt/user/appdata/todays-detective/compose/docker-compose.yml` |
 | `mongo-init/01-app-user.sh` | `/mnt/user/appdata/todays-detective/mongo/init/` |
 | `minio-init/init.sh` | `/mnt/user/appdata/todays-detective/minio-init/` |
-| `verify-mongo.sh`, `verify-minio.sh` | 임시 검증용 (배포 대상 아님) |
+| `verify-mongo.sh`, `verify-minio.sh` | 데이터 계층 검증용 (배포 대상 아님) |
+| `../server/` (API 소스) | `/mnt/user/appdata/todays-detective/server/` |
 | `.env` (레포에 없음) | `/mnt/user/appdata/todays-detective/compose/.env` — 권한 600 |
 
-현재 포함된 서비스는 **데이터 계층**뿐이다 (`mongo`, `minio`, `minio-init`).
-`api`·`web`은 Phase 2~3에서 추가한다.
+현재 포함된 서비스: `mongo`, `minio`, `minio-init`, `api`.
+`web`은 Phase 3에서 추가한다.
+
+API 소스는 [`server/`](../server/)에 있고 `/mnt/user/appdata/todays-detective/server/`로 배포한다
+(compose의 `build.context`가 `../server`).
 
 ## `.env`를 /boot에 두지 않는 이유
 
@@ -61,6 +65,7 @@ scp infra/docker-compose.yml        unraid:$B/compose/docker-compose.yml
 scp infra/mongo-init/01-app-user.sh unraid:$B/mongo/init/
 scp infra/minio-init/init.sh        unraid:$B/minio-init/
 scp .env.unraid                     unraid:$B/compose/.env
+scp -r server/app server/Dockerfile server/requirements*.txt        server/pytest.ini server/tests unraid:$B/server/
 
 # 3. 권한
 ssh unraid "chmod 600 $B/compose/.env; chmod 755 $B/mongo/init/*.sh $B/minio-init/*.sh"
@@ -113,3 +118,42 @@ ssh unraid 'curl -s -o /dev/null -w "%{http_code}\n" http://172.17.0.1:9100/toda
 
 Phase 1에서 확인된 결과: 익명 GET 200 / LAN 접근 실패 / 버킷 루트 403 /
 `Cache-Control: public, max-age=31536000, immutable` 유지.
+
+## API 회귀 테스트 (server/tests)
+
+`Dockerfile`은 멀티스테이지다. 기본(마지막) 스테이지가 `runtime`이라 compose는 target 지정
+없이 운영 이미지를 빌드하고, 테스트는 별도 스테이지에서 돌린다.
+
+```bash
+B=/mnt/user/appdata/todays-detective
+cd $B/server
+docker build --target test -t todays-detective-api-test .
+docker run --rm --network todays-detective-net --env-file $B/compose/.env \
+  todays-detective-api-test pytest
+```
+
+`--network`와 `--env-file`이 필요한 이유는 라우터 테스트가 실제 Mongo에 붙기 때문이다.
+
+### 테스트가 지키는 두 가지 안전장치
+
+1. **Gemini를 호출하지 않는다.** `conftest.py`의 `block_gemini`가 autouse로
+   `call_gemini`·`generate_portrait_image`·`get_client`를 예외 발생 함수로 바꿔둔다.
+   호출이 필요한 테스트는 각자 mock을 심는다. 실수로 실제 호출이 새면 즉시 실패하므로
+   **테스트가 비용을 발생시키지 않는다.**
+2. **운영 데이터를 건드리지 않는다.** 앱 계정(`detective`)은 `todays_detective` DB에만
+   권한이 있어 별도 DB를 쓸 수 없다. 그래서 같은 DB의 전용 컬렉션
+   `scenarios_pytest` / `feedbacks_pytest`를 쓰고 매 테스트마다 비운다.
+
+> 픅스처 정리 시점에 DB 핸들을 새로 얻는다. `TestClient` 컨텍스트가 닫힐 때 lifespan이
+> `db.close()`를 호출하므로, setup 때 잡아둔 핸들을 재사용하면
+> `Cannot use MongoClient after close`가 난다.
+
+### 커버리지
+
+| 파일 | 대상 |
+|---|---|
+| `test_sanitize.py` | 스포일러 정화. **Lambda 원문을 oracle로 두고 출력 동일성 비교** |
+| `test_evaluate_parsing.py` | 평가 정규식 3개와 폴백 문구. 대괄호 변형·같은 줄 등급·형식 이탈 |
+| `test_feedback_mapping.py` | camelCase ↔ snake_case 10필드 왕복, 300자 경계 |
+| `test_routes.py` | 엔드포인트 13개. 에러 메시지, 후행 슬래시, 클램프, 프롬프트 조립 |
+| `test_storage.py` | 초상화 리사이즈. 정사각형 균등 축소 + 비정사각형 center-crop 폴백 |

@@ -3,8 +3,12 @@
 #
 # Author: Hyunil Park
 # Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+#
+# 멀티스테이지. 기본(마지막) 스테이지는 runtime이므로 compose는 target 지정 없이 빌드된다.
+#   운영  : docker build .                  → runtime
+#   테스트: docker build --target test .     → pytest 포함
 
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,8 +22,25 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-# root로 돌리지 않는다.
 RUN useradd --create-home --uid 10001 appuser
+
+
+# ── 테스트 스테이지 ──────────────────────────────────────────────
+# pytest와 테스트 코드는 운영 이미지에 넣지 않는다.
+FROM base AS test
+
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+COPY pytest.ini .
+COPY tests ./tests
+
+CMD ["pytest"]
+
+
+# ── 운영 스테이지 (기본) ─────────────────────────────────────────
+FROM base AS runtime
+
+# root로 돌리지 않는다.
 USER appuser
 
 EXPOSE 8000
