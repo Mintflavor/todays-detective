@@ -243,28 +243,40 @@ cache pool   : sdc1 단일 ZFS, 444G 중 443G 여유 (거의 미사용)
 | docker0 | 172.17.0.1 |
 | SSH | `ssh unraid` (키 인증, `~/.ssh/unraid_todays_detective`) |
 
-### Phase 1 — 데이터 계층 부팅 (개발 PC에서 선검증)
+### Phase 1 — 데이터 계층 부팅 ✅ 완료 (2026-08-25)
 
-- [ ] 1.1 `docker-compose.yml` 초안 — `todays-detective-mongo` + `todays-detective-minio` + `todays-detective-minio-init`
-- [ ] 1.2 MinIO 버킷 초기화 (`todays-detective-minio-init`, 1회성)
-  ```sh
-  mc alias set local http://todays-detective-minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD"
-  mc mb -p local/todays-detective
-  mc anonymous set download local/todays-detective/portraits
-  ```
+unraid에 직접 배포하여 검증했다. 산출물은 [`infra/`](../infra/), 배포 절차는 [infra/README.md](../infra/README.md).
+
+- [x] 1.1 `infra/docker-compose.yml` — `todays-detective-{mongo,minio,minio-init}`. 이미지 태그 고정: `mongo:8.0.29`(8.0 LTS 라인), `minio/minio:RELEASE.2025-09-07T16-13-09Z`, `minio/mc:RELEASE.2025-08-13T08-35-41Z`
+- [x] 1.2 MinIO 버킷 초기화 — `infra/minio-init/init.sh` (멱등, 스택 기동마다 실행). 버킷 생성 + `portraits/` 프리픽스에만 익명 read
   > MinIO 커뮤니티 에디션은 2025년 이후 웹 콘솔 기능이 축소됐다. **`mc` CLI 기준으로 운영**하고 콘솔에 의존하지 않는 것이 안전하다.
   > 익명 read는 **`portraits/` 프리픽스에만** 부여한다. 버킷 전체 공개 금지
-- [ ] 1.3 Mongo 접속 확인 — SCRAM 자격증명으로 `todays_detective` DB 생성 (컬렉션은 첫 삽입 시 자동 생성)
-  - ⚠️ `.env.unraid`의 `MONGODB_URL`은 **앱 전용 계정**(`detective`, `authSource=todays_detective`)을 쓴다. mongo 공식 이미지의 entrypoint는 `admin` DB에 root 계정만 만들므로, 앱 계정은 초기화 스크립트로 따로 생성해야 한다
-  - `/docker-entrypoint-initdb.d/01-app-user.js` 를 마운트 (볼륨이 빈 첫 부팅에만 실행됨)
-    ```js
-    db = db.getSiblingDB("todays_detective");
-    db.createUser({ user: process.env.MONGO_APP_USERNAME,
-                    pwd:  process.env.MONGO_APP_PASSWORD,
-                    roles: [{ role: "readWrite", db: "todays_detective" }] });
-    ```
-  - root 계정으로 단순화하고 싶다면 `MONGODB_URL`을 `root:...@.../?authSource=admin`으로 바꾸면 되지만, 최소 권한 원칙에서 벗어난다
-- [ ] 1.4 `mc cp`로 더미 이미지 1장 업로드 → 익명 URL로 GET 200 확인
+- [x] 1.3 Mongo 초기화 — `infra/mongo-init/01-app-user.sh` (`.js`가 아니라 `.sh`로 작성. 셸이라 env 접근이 확실하다)
+  - 앱 전용 계정 `detective` (`readWrite@todays_detective`) 생성. 공식 이미지 entrypoint는 `admin` DB에 root만 만든다
+  - `scenarios`, `feedbacks` 컬렉션 선생성 → 최초 조회가 에러 대신 빈 배열을 반환한다
+  - 조회 패턴에 맞춘 인덱스 3개: `scenarios{created_at:-1}`, `scenarios{crime_type:1,created_at:-1}`, `feedbacks{created_at:-1}`
+  - ⚠️ 이 스크립트는 **`/data/db`가 빈 첫 부팅에만** 실행된다. 수정 후 재적용하려면 데이터를 비우거나 `mongosh`로 직접 실행해야 한다
+- [x] 1.4 검증 완료 — `infra/verify-{mongo,minio}.sh`. 결과는 §1-A
+
+#### §1-A. Phase 1 검증 결과
+
+| 항목 | 결과 |
+|---|---|
+| `todays-detective-mongo` | running (healthy) |
+| `todays-detective-minio` | running (healthy) |
+| `todays-detective-minio-init` | exited(0) — 정상 (1회성) |
+| 앱 계정 | `detective` roles=`readWrite@todays_detective` |
+| 컬렉션·인덱스 | `scenarios`(3), `feedbacks`(2) — 모두 `todays_detective`에 생성, `test`는 비어 있음 |
+| 익명 GET (`172.17.0.1:9100`) | **HTTP 200** |
+| LAN 접근 (`192.168.0.21:9100`) | **연결 불가** — §0-B 설계대로 동작 |
+| 버킷 루트 익명 목록 | **HTTP 403** — 객체 목록 비공개 |
+| 응답 헤더 | `Cache-Control: public, max-age=31536000, immutable`, `Content-Type: image/jpeg` 유지 |
+| 공개 포트 | minio `172.17.0.1:9100->9000`만. mongo는 공개 없음 |
+| `down` → `up` 재기동 | 계정·컬렉션·인덱스 전부 유지, `minio-init` 멱등 재실행 확인 |
+
+**Compose Manager 연동** — `/boot`은 vfat이라 권한이 없어 `.env`를 둘 수 없다. 플러그인의 **indirect 모드**로
+실제 compose와 `.env`는 appdata에 두고 `/boot`에는 메타데이터 4개만 올렸다 (immich가 쓰는 방식과 동일).
+unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상세는 [infra/README.md](../infra/README.md).
 
 ### Phase 2 — FastAPI 서비스 작성 (가장 큰 작업)
 
@@ -530,7 +542,7 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 | Phase | 내용 | 예상 |
 |---|---|---|
 | 0 | 준비 (도메인·네트워크·appdata·시크릿) | 1h |
-| 1 | 데이터 계층 부팅 + 검증 | 1~2h |
+| ~~1~~ | ~~데이터 계층 부팅 + 검증~~ | ✅ 완료 |
 | **2** | **FastAPI 재작성 + 테스트** | **7~10h** ← 최대 비중 |
 | 3 | Next.js 컨테이너화 | 3~4h |
 | 4 | unraid 배포 + NPM 설정 | 2~3h |
