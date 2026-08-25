@@ -411,9 +411,9 @@ unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상�
 
 | 단계 | 내용 | 대응 항목 |
 |---|---|---|
-| **2-A** | 프로젝트 골격 — `requirements.txt`, `config.py`, `db.py`, `main.py`(`/healthz`), `Dockerfile` | 2.1, 2.7 |
-| **2-B** | 외부 연동 — `storage.py`(MinIO), `gemini.py`(텍스트 + **§0-F 이미지 재작성**), `prompts.py` 이식 | 2.2 |
-| **2-C** | 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
+| ~~**2-A**~~ | ✅ 프로젝트 골격 — `requirements.txt`, `config.py`, `db.py`, `main.py`(`/healthz`), `Dockerfile` | 2.1, 2.7 |
+| ~~**2-B**~~ | ✅ 외부 연동 — `storage.py`(MinIO), `gemini.py`(텍스트 + §0-F 이미지 재작성), `prompts.py` 이식 | 2.2 |
+| ~~**2-C**~~ | ✅ 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
 | **2-D** | 게임 라우터 — `routers/game.py` 5개 엔드포인트 ← **가장 큼** | 2.4 |
 | **2-E** | CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
 | **2-F** | 회귀 테스트 — pytest 3종 + 컨테이너 기동 검증 | 2.8 |
@@ -452,11 +452,24 @@ server/
   #   → https://cdn.detective.example.com/todays-detective/portraits/<uuid>.jpg
   ```
   업로드 시 `Cache-Control: public, max-age=31536000, immutable`은 기존 코드 그대로 유지 (불변 UUID 키라서 안전)
-- [ ] 2.3 `sanitize.py` — **아래 상수를 글자 그대로 이식** (스포일러 유출 방지의 핵심)
+- [x] 2.3 `sanitize.py` + `models.py` — 상수를 글자 그대로 이식하고 **Lambda 원문과 출력 동일성을 실측 검증**했다
   ```python
-  _SPOILER_TOP_FIELDS = ("solution", "timeline_truth", "truth")
-  _SPOILER_SUSPECT_FIELDS = ("isCulprit", "secret", "real_action", "motive", "trick")
+  SPOILER_TOP_FIELDS = ("solution", "timeline_truth", "truth")
+  SPOILER_SUSPECT_FIELDS = ("isCulprit", "secret", "real_action", "motive", "trick")
   ```
+  검증 방식: Lambda 원문 `_sanitize_case_data`를 그대로 복사해 기준(oracle)으로 두고
+  같은 입력의 출력 JSON을 정렬 비교했다 (`server/verify_2c.py`). 33개 검사 전부 통과.
+
+  **의도적 차이 1건** — suspects 배열에 dict이 아닌 값이 섞이면 Lambda는 `s.items()`에서
+  터져 500을 낸다. 새 구현은 해당 항목을 건너뛴다. 정상 입력에서는 출력이 완전히 동일하다.
+
+  **부가 안전장치** — 프롬프트 스키마에 없는 필드가 case_data나 suspect에 나타나면
+  경고 로그를 남긴다. 정화 동작은 바뀌지 않는다. LLM이 새 스포일러 필드를 만들어냈을 때
+  denylist가 조용히 놓치는 상황을 드러내기 위한 것이다.
+
+  `models.py` 설계 방침: **`case_data`는 엄격한 Pydantic 모델로 만들지 않는다.**
+  LLM 생성 JSON이라 필드가 유동적이어서, 스키마를 강제하면 정상 시나리오까지 422로 튕긴다.
+  `dict[str, Any]`로 통과시키고 검증은 게임 진행에 필요한 최소 조건만 한다.
 - [ ] 2.4 `routers/game.py` — **재작성이 아니라 이식**해야 할 부분:
   - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성(**§0-F — `generateContent` + `imageConfig` 방식으로 재작성**) → Pillow 512px JPEG q80 축소 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
   - `chat`: `generate_suspect_prompt(suspect, world_setting, timeline_truth, evidence_list)` → `f"{system}\n\n[이전 대화]\n{history}\n\n탐정: {message}\n용의자:"`, 모델은 `GEMINI_CHAT_MODEL or GEMINI_MODEL`
@@ -484,6 +497,11 @@ server/
 - [ ] 3.2 **`app/api/game/` 전체 삭제** (route 5개 + `lib/{gemini,prompts,s3}.ts`)
   - ⚠️ **필수 순서**: Next.js는 같은 경로에 Route Handler가 있으면 rewrite를 무시한다. 과거 커밋 `0af9b78`("`/api/:path*` rewrite 제거 — Route Handler 우선 적용")이 정확히 이 함정에 걸린 기록이다. **핸들러를 지우기 전에는 rewrite가 동작하지 않는다.**
 - [ ] 3.3 [app/lib/api.ts](../app/lib/api.ts) — `API_BASE_URL`을 `'/server'` 상수로 교체
+- [ ] 3.3-b [app/types/game.ts](../app/types/game.ts) — **런타임과 어긋난 타입 정정**
+  - `Suspect.secret`, `Suspect.isCulprit`, `CaseData.solution`, `CaseData.timeline_truth`가
+    **non-optional로 선언**돼 있지만 서버 정화본에는 존재하지 않는다 (§2-C)
+  - 지금은 resolution 이전에 아무도 읽지 않아 사고가 안 났을 뿐이다. optional(`?`)로 바꿔
+    타입이 실제 응답을 반영하게 한다
 - [ ] 3.4 [useGeminiClient.ts](../app/hooks/useGeminiClient.ts) — `/api/game/*` → `/server/api/game/*` (3곳)
 - [ ] 3.5 **`NEXT_PUBLIC_API_URL` 클라이언트 사용 전면 제거**
   - `NEXT_PUBLIC_*`는 **빌드 타임에 번들에 박힌다.** 런타임 주입이 안 되므로 컨테이너 이미지가 환경에 종속된다. 전부 same-origin `/server/*`로 바꾸면 이 문제와 CORS가 **동시에** 사라진다
