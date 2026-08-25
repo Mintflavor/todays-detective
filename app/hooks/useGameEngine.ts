@@ -61,6 +61,10 @@ export default function useGameEngine() {
   // `generateCase` 자기 자신이라 재시도가 성공해도 결과를 받는 곳이 없었다.
   // 사건 생성 1회가 약 159원이므로 "돈만 나가고 화면은 그대로"였다.
   const [gameError, setGameError] = useState<GameError | null>(null);
+  // 생성 실패 사실은 **모달과 별개로** 남겨야 한다.
+  // gameError로 판단하면 사용자가 모달을 닫는 순간 실패한 사실이 사라지고,
+  // 튜토리얼을 마쳤을 때 로딩 화면으로 들어가 갇힌다 (실제로 그렇게 갇혔다).
+  const [caseFetchFailed, setCaseFetchFailed] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -206,10 +210,12 @@ export default function useGameEngine() {
 
   const fetchCase = useCallback(async () => {
     setGameError(null);
+    setCaseFetchFailed(false);
     try {
       const data = await generateCase();
       setPreloadedData(data);
     } catch (err) {
+      setCaseFetchFailed(true);
       console.error("Case generation failed:", err);
       // 로딩 화면에 갇히지 않도록 반드시 흐름을 되돌린다.
       // 튜토리얼 중이면 그대로 두고(에러 모달이 위에 뜬다), 이미 로딩이면 인트로로.
@@ -237,15 +243,22 @@ export default function useGameEngine() {
     markTutorialSeen();
     if (preloadedData) {
       finalizeGameStart(preloadedData);
-    } else if (gameError) {
+    } else if (caseFetchFailed) {
       // 생성이 이미 실패했다. 로딩 화면에 넣으면 갇힌다.
+      // 사용자가 모달을 닫았을 수 있으니 왜 못 들어가는지 다시 알려준다.
       setPhase('intro');
+      setGameError(prev => prev ?? {
+        title: '사건 배정 불가',
+        message: '사건 파일을 받지 못했습니다. 사건 기록실에서 지난 사건을 플레이할 수 있습니다.',
+        retry: () => fetchCaseRef.current(),
+        secondary: { label: '사건 기록실로 가기', action: goToLoadMenu },
+      });
     } else {
       setLoadingType('case');
       setLoadingText("사건 파일을 불러오는 중...");
       setPhase('loading');
     }
-  }, [preloadedData, gameError, finalizeGameStart]);
+  }, [preloadedData, caseFetchFailed, finalizeGameStart, goToLoadMenu]);
 
   /** API 호출만 담당한다. AP 차감과 낙관적 렌더링은 호출부에서 한 번만 한다. */
   const runInterrogationRef = useRef<(text: string, suspectId: number, history: string) => void>(() => {});
@@ -373,6 +386,7 @@ export default function useGameEngine() {
     setUserInput("");
     setShowTimeOverModal(false);
     setGameError(null);
+    setCaseFetchFailed(false);
     resetTimer();
     setPhase('intro');
   }, [resetTimer]);
