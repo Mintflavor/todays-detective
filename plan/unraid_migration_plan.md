@@ -415,7 +415,7 @@ unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상�
 | ~~**2-B**~~ | ✅ 외부 연동 — `storage.py`(MinIO), `gemini.py`(텍스트 + §0-F 이미지 재작성), `prompts.py` 이식 | 2.2 |
 | ~~**2-C**~~ | ✅ 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
 | ~~**2-D**~~ | ✅ 게임 라우터 — `routers/game.py` 5개 엔드포인트 (통합 검증 완료) | 2.4 |
-| **2-E** | CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
+| ~~**2-E**~~ | ✅ CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
 | **2-F** | 회귀 테스트 — pytest 3종 + 컨테이너 기동 검증 | 2.8 |
 
 새 디렉터리 `server/`를 만들고 `lambda/`의 검증된 로직을 이식한다.
@@ -508,8 +508,34 @@ server/
 생성된 시나리오 1건과 초상화 3장은 **삭제하지 않고 보존**한다 — Phase 3에서 "지난 사건 기록"
 플로우를 검증할 첫 데이터다.
 
-- [ ] 2.5 `routers/scenarios.py` — 목록은 `{"case_data": 0}` projection, `page>=1`, `1<=limit<=50` 클램프 유지
-- [ ] 2.6 `routers/feedbacks.py` — 조회 시 snake→camel 역매핑 유지
+- [x] 2.5 `routers/scenarios.py` — projection·클램프·에러 메시지 유지 (§2-E)
+- [x] 2.6 `routers/feedbacks.py` — snake→camel 역매핑 유지 (§2-E)
+
+#### §2-E. Phase 2-E 검증 결과 (48건 전부 통과, Gemini 호출 0회)
+
+엔드포인트 13개 등록 완료. 2-D에서 보존한 시나리오를 그대로 활용해 추가 비용 없이 검증했다.
+
+**유지한 Lambda 동작**
+
+| 항목 | 내용 |
+|---|---|
+| 후행 슬래시 | 프론트가 `/scenarios/?page=..` 형태로 호출한다. Lambda는 `path.rstrip("/")`로 받았다. 307 리다이렉트를 피하려고 `""`와 `"/"` 두 경로를 등록했다 |
+| 목록 projection | `{"case_data": 0}` — 본문 제외 확인 |
+| 클램프 | `page=0`·`limit=999`를 **거부하지 않고 클램프**한다 (Lambda 동작). 1↔50 범위 |
+| 에러 메시지 차이 | CRUD는 `Invalid id` / `Not found`, 게임 라우터는 `Invalid scenario id` / `Scenario not found`. 원문 그대로 유지 |
+| 입력 형식 차이 | `POST /feedbacks`는 **snake_case**(`scenario_id`, `game_result`) + **201**, `POST /api/game/feedback`은 camelCase + 200 |
+| 역매핑 | 피드백 조회 시 `game_result` 10필드가 camelCase로 복원됨 확인 |
+| 정렬·필터 | `created_at` 역순, `crime_type` 필터 동작 확인 |
+
+**개선된 동작 1건** — `page=abc` 같은 비숫자 입력은 Lambda에서 `int()` 예외로 **500**이 났다.
+FastAPI는 422를 반환한다.
+
+**Phase 5.3 대상 재확인** — `GET /scenarios/{id}`가 `solution`·`isCulprit`을 포함한 원본을
+그대로 반환하는 것을 실제 응답으로 확인했다. 같은 시나리오를 `/api/game/scenario/{id}`로
+조회하면 `solution`이 없다. 인증을 붙일 지점이 명확하다.
+
+라우터 3개에 `TODO(Phase 5.2)` 주석으로 인증이 필요한 지점을 표시했다
+(`POST /scenarios`, `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`).
 - [ ] 2.7 `Dockerfile` — `python:3.12-slim`, non-root 유저, `uvicorn --host 0.0.0.0 --port 8000`
 - [ ] 2.8 **pytest 회귀 테스트** — 최소 3종: 스포일러 정화 / 평가 정규식 파싱 / 피드백 필드 매핑. 정식 재작성을 택했으므로 사실상 필수다
 
