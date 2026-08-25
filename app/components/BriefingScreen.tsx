@@ -97,6 +97,7 @@ export default function BriefingScreen({ caseData, onStartInvestigation }: Brief
                       {s.portraitImage ? (
                         <Image
                           src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
+                          unoptimized
                           alt={s.name}
                           fill
                           className="object-cover"

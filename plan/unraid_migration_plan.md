@@ -575,25 +575,25 @@ target 지정 없이 운영 이미지를 빌드하고, `--target test`로 pytest
 
 Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제거했다.
 
-### Phase 3 — Next.js 컨테이너화
+### Phase 3 — Next.js 컨테이너화 ✅ 완료 (2026-08-25)
 
-- [ ] 3.1 `next.config.ts`
+- [x] 3.1 `next.config.ts`
   - `output: 'standalone'` 추가
   - `images.remotePatterns` → `cdn.detective.example.com`
   - `/server/:path*` → `http://todays-detective-api:8000/:path*`
-- [ ] 3.2 **`app/api/game/` 전체 삭제** (route 5개 + `lib/{gemini,prompts,s3}.ts`)
+- [x] 3.2 **`app/api/game/` 전체 삭제** (route 5개 + `lib/{gemini,prompts,s3}.ts`)
   - ⚠️ **필수 순서**: Next.js는 같은 경로에 Route Handler가 있으면 rewrite를 무시한다. 과거 커밋 `0af9b78`("`/api/:path*` rewrite 제거 — Route Handler 우선 적용")이 정확히 이 함정에 걸린 기록이다. **핸들러를 지우기 전에는 rewrite가 동작하지 않는다.**
-- [ ] 3.3 [app/lib/api.ts](../app/lib/api.ts) — `API_BASE_URL`을 `'/server'` 상수로 교체
-- [ ] 3.3-b [app/types/game.ts](../app/types/game.ts) — **런타임과 어긋난 타입 정정**
+- [x] 3.3 [app/lib/api.ts](../app/lib/api.ts) — `API_BASE_URL`을 `'/server'` 상수로 교체
+- [x] 3.3-b [app/types/game.ts](../app/types/game.ts) — **런타임과 어긋난 타입 정정**
   - `Suspect.secret`, `Suspect.isCulprit`, `CaseData.solution`, `CaseData.timeline_truth`가
     **non-optional로 선언**돼 있지만 서버 정화본에는 존재하지 않는다 (§2-C)
   - 지금은 resolution 이전에 아무도 읽지 않아 사고가 안 났을 뿐이다. optional(`?`)로 바꿔
     타입이 실제 응답을 반영하게 한다
-- [ ] 3.4 [useGeminiClient.ts](../app/hooks/useGeminiClient.ts) — `/api/game/*` → `/server/api/game/*` (3곳)
-- [ ] 3.5 **`NEXT_PUBLIC_API_URL` 클라이언트 사용 전면 제거**
+- [x] 3.4 [useGeminiClient.ts](../app/hooks/useGeminiClient.ts) — `/api/game/*` → `/server/api/game/*` (3곳)
+- [x] 3.5 **`NEXT_PUBLIC_API_URL` 전면 제거**
   - `NEXT_PUBLIC_*`는 **빌드 타임에 번들에 박힌다.** 런타임 주입이 안 되므로 컨테이너 이미지가 환경에 종속된다. 전부 same-origin `/server/*`로 바꾸면 이 문제와 CORS가 **동시에** 사라진다
-- [ ] 3.6 `package.json` — `sharp`, `@aws-sdk/client-s3`, `@vercel/analytics` 제거 + `app/layout.tsx`에서 `<Analytics />` 제거
-- [ ] 3.7 `Dockerfile` (multi-stage)
+- [x] 3.6 `package.json` — `sharp`, `@aws-sdk/client-s3`, `@vercel/analytics` 제거 + `app/layout.tsx`에서 `<Analytics />` 제거
+- [x] 3.7 `Dockerfile` (multi-stage)
   ```
   deps  : npm ci
   build : npm run build           # output:'standalone'
@@ -601,7 +601,45 @@ Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제
           COPY .next/standalone ./ ; .next/static ; public
           CMD ["node", "server.js"]
   ```
-- [ ] 3.8 `.dockerignore` — `node_modules`, `.next`, `lambda/`, `plan/`, `.git`
+- [x] 3.8 `.dockerignore` — `node_modules`, `.next`, `lambda/`, `plan/`, `.git`
+
+#### §3-A. Phase 3 결과
+
+`todays-detective-web`이 `172.17.0.1:3100`에 healthy 상태로 떠 있다.
+
+**검증**
+
+| 항목 | 결과 |
+|---|---|
+| `GET /` | 200, 인트로 화면 렌더링 |
+| `GET /server/healthz` | 200 → `{"status":"ok",...}` — **rewrite 프록시 동작** |
+| `GET /server/scenarios` | 200, 리다이렉트 없음 |
+| 삭제한 `POST /api/game/*` 3개 | **404** (의도된 결과) |
+| 남긴 `POST /api/admin/verify` | 401 (동작 유지) |
+| `Cache-Control: no-store` | 프록시를 그대로 통과 |
+| LAN(`192.168.0.21:3100`) | 연결 불가 — §0-B 설계대로 |
+| 브라우저 E2E | 인트로 → 사건 기록실 → 목록 → 브리핑까지 정상 |
+
+**`images.remotePatterns`를 두지 않기로 했다.** 초상화는 이미 512×512 q80(약 58KB) +
+`immutable` 캐시다. Next 최적화기를 거치면 홈서버 CPU만 쓰고 얻는 게 없다. 원격 초상화
+`<Image>`에 `unoptimized`를 지정했고, 덕분에 **공개 도메인을 빌드 타임에 박을 필요가 없어졌다**
+(도메인이 바뀌어도 재빌드가 불필요). 브라우저에서 원격 3장은 raw URL, 로컬 배경 5장은
+`/_next/image`를 지나는 것을 확인했다.
+
+**후행 슬래시 문제** — 2-E에서 FastAPI에 `/scenarios`와 `/scenarios/`를 모두 등록해 307을
+피했는데, **Next.js가 rewrite 적용 전에 후행 슬래시를 308로 정규화**한다. 프론트에서
+슬래시를 떼는 것으로 해결했다 (`/scenarios?page=..`). FastAPI의 이중 등록은 API 직접 호출을
+위해 유지한다.
+
+**제거한 의존성** — `sharp`, `@aws-sdk/client-s3`, `@vercel/analytics`, **`@google/genai`**.
+마지막 것은 `scripts/test-gemini.mjs`만 쓰고 있었고 그 스크립트는 이미 은퇴한
+`gemini-3-flash-preview`를 참조했다. Gemini 검증은 FastAPI/pytest로 대체돼 스크립트와 함께
+제거했다. 프론트엔드 dependencies는 이제 `next`, `react`, `react-dom`, `lucide-react` 4개다.
+
+**⚠️ Phase 4 인수 사항** — DB의 기존 시나리오 1건은 초상화 URL이
+`https://cdn.detective.example.com/...`로 박혀 있다. 실제 도메인을 정하면
+`PUBLIC_ASSET_BASE_URL`을 바꾸고 그 3개 URL도 갱신해야 한다 (또는 해당 시나리오를 지우고
+새로 생성). 신규 생성분은 자동으로 새 도메인을 쓴다.
 
 ### Phase 4 — unraid 배포 + NPM 설정
 
@@ -617,7 +655,10 @@ Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제
     - `todays-detective-minio` → `172.17.0.1:9100:9000`
   - `todays-detective-api`, `todays-detective-mongo` → **포트 공개 없음**
   - ⚠️ 네트워크에 `internal: true`를 **쓰지 말 것** — api가 Gemini API로 나가는 egress가 막힌다
-- [ ] 4.3 `.env`를 `/mnt/user/appdata/todays-detective/.env`에 배치, 권한 `600`, compose에서 `env_file`로 참조
+- [ ] 4.3 `.env`를 `/mnt/user/appdata/todays-detective/compose/.env`에 배치, 권한 `600`
+  - `WEB_DOMAIN`, `CDN_DOMAIN`, `PUBLIC_ASSET_BASE_URL`, `ALLOWED_ORIGINS` 4곳의 `example.com`을 실제 도메인으로 교체
+- [ ] 4.3-b 기존 시나리오의 초상화 URL 갱신 (§3-A) — `cdn.detective.example.com` → 실제 도메인.
+  대상이 1건 3개 URL뿐이므로 `mongosh` 한 줄로 처리하거나 해당 시나리오를 삭제하고 새로 생성한다
 - [ ] 4.4 `docker compose up -d` → `docker exec todays-detective-web wget -qO- http://todays-detective-api:8000/healthz`로 내부 연결 확인
 - [ ] 4.5 포트 공개는 §0-B의 docker0 바인드 2개로 한정. `0.0.0.0` 바인드는 쓰지 않는다
 - [ ] 4.6 전 서비스 `restart: unless-stopped`, 이미지 태그 **고정** (`latest` 금지 — 재부팅 시 예고 없는 메이저 업그레이드 방지)

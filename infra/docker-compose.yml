@@ -127,6 +127,32 @@ services:
       retries: 5
       start_period: 20s
 
+  # ───────────────────────────── WEB ───────────────────────────────
+  todays-detective-web:
+    container_name: todays-detective-web
+    build:
+      context: ../web             # /mnt/user/appdata/todays-detective/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # 관리자 비밀번호 확인용 Route Handler가 아직 web에 남아 있다 (Phase 5.4에서 api로 이동)
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    ports:
+      # docker0에만 바인드. NPM(기본 bridge)은 도달하지만 LAN에서는 닿지 않는다. (§0-B)
+      # 호스트 3000은 NPM이 점유 중이라 3100을 쓴다.
+      - "172.17.0.1:3100:3000"
+    depends_on:
+      todays-detective-api:
+        condition: service_healthy
+    networks:
+      - todays-detective-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
 networks:
   # 단일 user-defined 네트워크. 컨테이너명 DNS는 스택 내부에서만 필요하다.
   # internal: true 는 쓰지 않는다 — Phase 2의 api가 Gemini API로 나가는 egress가 막힌다.

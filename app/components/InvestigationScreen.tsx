@@ -223,6 +223,7 @@ export default function InvestigationScreen({
                     {s.portraitImage ? (
                       <Image 
                         src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
+                        unoptimized
                         alt={s.name} 
                         fill
                         className={`object-cover ${currentSuspectId === s.id ? "opacity-100" : "opacity-70 grayscale"}`}
