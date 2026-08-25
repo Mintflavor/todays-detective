@@ -306,26 +306,28 @@ class TestScenariosCrud:
         r = client.get(path)
         assert r.status_code == 200, "307 리다이렉트 없이 바로 200이어야 한다"
 
-    def test_detail_returns_unsanitized(self, client, saved_scenario):
-        """⚠️ 관리자용. Phase 5.3에서 인증 뒤로 옮긴다."""
-        body = client.get("/scenarios/" + saved_scenario).json()
+    def test_detail_returns_unsanitized(self, client, saved_scenario, admin_headers):
+        """⚠️ 관리자 인증 필수. 정화되지 않은 원본을 반환한다."""
+        body = client.get("/scenarios/" + saved_scenario, headers=admin_headers).json()
         assert body["case_data"]["solution"]
         assert any(s.get("isCulprit") for s in body["case_data"]["suspects"])
 
-    def test_crud_error_messages_differ_from_game(self, client):
-        assert client.get("/scenarios/bad").json()["detail"] == "Invalid id"
-        assert client.get("/scenarios/" + "0" * 24).json()["detail"] == "Not found"
+    def test_crud_error_messages_differ_from_game(self, client, admin_headers):
+        assert client.get("/scenarios/bad", headers=admin_headers).json()["detail"] == "Invalid id"
+        assert (client.get("/scenarios/" + "0" * 24, headers=admin_headers).json()["detail"]
+                == "Not found")
 
-    def test_create_and_delete(self, client):
-        r = client.post("/scenarios", json={
+    def test_create_and_delete(self, client, admin_headers):
+        r = client.post("/scenarios", headers=admin_headers, json={
             "title": "t", "summary": "s", "crime_type": "절도", "case_data": {"x": 1}})
         assert r.status_code == 201
         sid = r.json()["_id"]
-        assert client.delete("/scenarios/" + sid).json() == {"deleted": sid}
-        assert client.get("/scenarios/" + sid).status_code == 404
+        assert client.delete("/scenarios/" + sid, headers=admin_headers).json() == {"deleted": sid}
+        assert client.get("/scenarios/" + sid, headers=admin_headers).status_code == 404
 
-    def test_crime_type_filter(self, client, saved_scenario):
-        client.post("/scenarios", json={"title": "절도건", "crime_type": "절도"})
+    def test_crime_type_filter(self, client, saved_scenario, admin_headers):
+        client.post("/scenarios", headers=admin_headers,
+                    json={"title": "절도건", "crime_type": "절도"})
         assert len(client.get("/scenarios", params={"crime_type": "살인"}).json()) == 1
         assert len(client.get("/scenarios", params={"crime_type": "절도"}).json()) == 1
 
@@ -350,12 +352,12 @@ class TestFeedbacksCrud:
         })
         assert r.status_code == 201, "이 경로는 201이다 (게임 경로는 200)"
 
-    def test_list_remaps_to_camel(self, client):
+    def test_list_remaps_to_camel(self, client, admin_headers):
         client.post("/feedbacks", json={
             "content": "좋아요",
             "game_result": {"selected_suspect_name": "김서준", "time_taken": "07:31"},
         })
-        gr = client.get("/feedbacks").json()[0]["game_result"]
+        gr = client.get("/feedbacks", headers=admin_headers).json()[0]["game_result"]
         assert gr["selectedSuspectName"] == "김서준"
         assert gr["timeTaken"] == "07:31"
         assert "selected_suspect_name" not in gr
@@ -374,17 +376,17 @@ class TestFeedbacksCrud:
         doc = test_db["feedbacks"].find_one({})
         assert doc["game_result"]["selected_suspect_id"] == 2
 
-    def test_delete(self, client):
+    def test_delete(self, client, admin_headers):
         fid = client.post("/feedbacks", json={"content": "x"}).json()["_id"]
-        assert client.delete("/feedbacks/" + fid).json() == {"deleted": fid}
-        assert client.delete("/feedbacks/" + fid).status_code == 404
+        assert client.delete("/feedbacks/" + fid, headers=admin_headers).json() == {"deleted": fid}
+        assert client.delete("/feedbacks/" + fid, headers=admin_headers).status_code == 404
 
-    def test_delete_invalid_id_400(self, client):
-        r = client.delete("/feedbacks/bad")
+    def test_delete_invalid_id_400(self, client, admin_headers):
+        r = client.delete("/feedbacks/bad", headers=admin_headers)
         assert r.status_code == 400 and r.json()["detail"] == "Invalid id"
 
-    def test_sorted_newest_first(self, client):
+    def test_sorted_newest_first(self, client, admin_headers):
         first = client.post("/feedbacks", json={"content": "첫번째"}).json()["_id"]
         second = client.post("/feedbacks", json={"content": "두번째"}).json()["_id"]
-        items = client.get("/feedbacks").json()
+        items = client.get("/feedbacks", headers=admin_headers).json()
         assert [i["_id"] for i in items][:2] == [second, first]

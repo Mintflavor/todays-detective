@@ -69,13 +69,21 @@ _STORAGE_OPTIONS = (
     else {}
 )
 
+# ⚠️ headers_enabled=False 로 둔다. True로 켜면 **정상 응답이 전부 500이 된다.**
+#    slowapi의 `_inject_headers`는 엔드포인트 반환값이 starlette Response가 아니면
+#    `parameter 'response' must be an instance of ...` 예외를 던진다.
+#    우리 엔드포인트는 Pydantic 모델을 반환하므로 전부 걸린다.
+#    (켜려면 rate-limited 엔드포인트마다 `response: Response` 파라미터를 추가해야 한다)
+#
+#    실제로 이 설정 때문에 성공 경로가 500이 된 적이 있다. 에러 경로(404/429)만 테스트해서
+#    배포 후에야 발견했다 — tests/test_ratelimit.py의 회귀 테스트가 이를 고정한다.
 limiter = Limiter(
     key_func=client_key,
     storage_uri=_settings.rate_limit_storage_uri or None,
     storage_options=_STORAGE_OPTIONS,
     strategy="fixed-window",
     enabled=_settings.rate_limit_enabled,
-    headers_enabled=True,  # X-RateLimit-* 응답 헤더
+    headers_enabled=False,
 )
 
 

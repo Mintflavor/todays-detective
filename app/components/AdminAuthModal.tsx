@@ -1,4 +1,11 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 import React, { useState, useEffect, useRef } from 'react';
+import { adminLogin } from '../lib/adminAuth';
 
 interface AdminAuthModalProps {
   onSuccess: () => void;
@@ -23,24 +30,13 @@ export default function AdminAuthModal({ onSuccess, onCancel }: AdminAuthModalPr
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/admin/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        onSuccess();
-      } else {
-        setError(data.message || 'Access Denied.');
-        setPassword('');
-      }
+      // API가 단기 토큰을 발급한다. 이후 관리자 요청은 이 토큰을 실어 보낸다.
+      // (이전 방식은 비밀번호 확인만 하고 실제 호출은 무인증으로 나갔다)
+      await adminLogin(password);
+      onSuccess();
     } catch (err) {
-      setError('Connection failed.');
+      setError(err instanceof Error ? err.message : 'Connection failed.');
+      setPassword('');
     } finally {
       setIsLoading(false);
     }

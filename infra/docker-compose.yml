@@ -140,9 +140,8 @@ services:
       context: ../web             # /mnt/user/appdata/todays-detective/web
       dockerfile: Dockerfile
     restart: unless-stopped
-    environment:
-      # 관리자 비밀번호 확인용 Route Handler가 아직 web에 남아 있다 (Phase 5.4에서 api로 이동)
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    # 환경변수가 없다. 관리자 인증이 api로 이동해 web은 더 이상 비밀값을 갖지 않는다.
+    # (Route Handler 전무 — app/api/ 디렉터리 자체가 사라졌다)
     ports:
       # docker0에만 바인드. NPM(기본 bridge)은 도달하지만 LAN에서는 닿지 않는다. (§0-B)
       # 호스트 3000은 NPM이 점유 중이라 3100을 쓴다.

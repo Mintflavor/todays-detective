@@ -18,7 +18,7 @@ from slowapi.middleware import SlowAPIMiddleware
 
 from . import db, storage
 from .ratelimit import limiter, log_config as log_ratelimit_config
-from .routers import feedbacks, game, scenarios
+from .routers import admin, feedbacks, game, scenarios
 from .config import get_settings
 
 settings = get_settings()
@@ -103,6 +103,7 @@ def healthz():
     }
 
 
+app.include_router(admin.router)
 app.include_router(game.router)
 app.include_router(scenarios.router)
 app.include_router(feedbacks.router)

@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     # 아래 둘은 비용이 미미하므로 남용 방어 수준. 한 판 최대 20 AP = 심문 20회.
     rate_limit_chat: str = "60/hour"
     rate_limit_evaluate: str = "15/hour"
+    # 관리자 로그인 무차별 대입 방어
+    rate_limit_admin_login: str = "30/hour"
     # 비우면 메모리 저장소를 쓴다 — 재시작 시 카운터가 초기화되어 월 상한이 무의미해진다.
     rate_limit_storage_uri: str = ""
 

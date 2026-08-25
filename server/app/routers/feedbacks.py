@@ -17,10 +17,11 @@ from typing import Any, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, field_validator
 
 from .. import db
+from ..auth import require_admin
 from ..models import (
     FEEDBACK_MAX_LENGTH,
     DeleteResult,
@@ -69,13 +70,17 @@ def create_feedback(payload: FeedbackCreateSnake) -> dict[str, str]:
     return {"_id": str(result.inserted_id)}
 
 
-@router.get("", response_model=list[FeedbackItem])
-@router.get("/", response_model=list[FeedbackItem], include_in_schema=False)
+@router.get("", response_model=list[FeedbackItem], dependencies=[Depends(require_admin)])
+@router.get("/", response_model=list[FeedbackItem],
+            dependencies=[Depends(require_admin)], include_in_schema=False)
 def list_feedbacks(
     page: int = Query(1),
     limit: int = Query(10),
 ) -> list[FeedbackItem]:
-    """목록. game_result를 snake_case → camelCase로 역매핑한다 (Lambda와 동일)."""
+    """목록. game_result를 snake_case → camelCase로 역매핑한다 (Lambda와 동일).
+
+    관리자 전용 — 다른 사용자의 추리 내용과 게임 결과가 담겨 있다.
+    """
     page = max(page, 1)
     limit = min(max(limit, 1), 50)
 
@@ -94,9 +99,9 @@ def list_feedbacks(
     return [FeedbackItem.model_validate(d) for d in docs]
 
 
-@router.delete("/{feedback_id}", response_model=DeleteResult)
+@router.delete("/{feedback_id}", response_model=DeleteResult,
+               dependencies=[Depends(require_admin)])
 def delete_feedback(feedback_id: str) -> DeleteResult:
-    # TODO(Phase 5.2): X-API-Key 필요. 지금은 누구나 삭제할 수 있다.
     try:
         oid = ObjectId(feedback_id)
     except (InvalidId, TypeError):

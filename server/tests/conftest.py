@@ -117,6 +117,18 @@ def client(test_db):
         yield c
 
 
+@pytest.fixture
+def admin_headers() -> dict[str, str]:
+    """관리자 전용 엔드포인트 호출용 헤더.
+
+    비밀번호 로그인을 거치지 않고 토큰을 직접 발급한다 (로그인 자체는 별도 테스트).
+    """
+    from app.auth import issue_token
+
+    token, _ = issue_token()
+    return {"X-Admin-Token": token}
+
+
 # ─────────────────────────── 데이터 픅스처 ───────────────────────────
 @pytest.fixture
 def full_case() -> dict[str, Any]:

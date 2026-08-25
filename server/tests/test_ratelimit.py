@@ -117,7 +117,91 @@ class TestStorage:
         )
 
 
+class TestHeadersDisabled:
+    """켜면 정상 응답이 전부 500이 된다. 배포 후에야 발견한 버그다."""
+
+    def test_headers_not_enabled(self):
+        assert limiter._headers_enabled is False, (
+            "headers_enabled=True면 slowapi가 Pydantic 반환값에 헤더를 주입하려다 "
+            "'parameter response must be an instance of Response' 예외로 500을 낸다"
+        )
+
+
+class TestLimiterEnabledSuccessPath:
+    """리미터를 **켠 상태로** 성공 응답을 통과시킨다.
+
+    conftest는 실제 예산 카운터 소진을 막으려 리미터를 끈다. 그 결과 데코레이터 경로가
+    한 번도 실행되지 않아 위 버그를 174개 테스트가 모두 놓쳤다.
+    여기서는 저장소를 메모리로 갈아끼워 **운영 카운터를 건드리지 않고** 켠다.
+    """
+
+    @pytest.fixture
+    def limited_client(self, client, monkeypatch):
+        from limits.storage import MemoryStorage
+
+        from limits.strategies import FixedWindowRateLimiter
+
+        storage = MemoryStorage()
+        monkeypatch.setattr(limiter, "enabled", True)
+        monkeypatch.setattr(limiter, "_storage", storage)
+        # `limiter.limiter`는 읽기 전용 프로퍼티다. 실제 저장 속성은 `_limiter`다.
+        monkeypatch.setattr(limiter, "_limiter", FixedWindowRateLimiter(storage))
+        return client
+
+    def test_chat_success_returns_200(self, limited_client, monkeypatch, test_db, full_case):
+        """가장 흔한 성공 경로. 여기서 500이 나면 게임이 통째로 멈춘다."""
+        from app import gemini
+
+        res = test_db["scenarios"].insert_one({"case_data": full_case})
+        monkeypatch.setattr(gemini, "call_gemini", lambda *a, **k: "주방에 있었습니다.")
+
+        r = limited_client.post("/api/game/chat", json={
+            "scenarioId": str(res.inserted_id), "suspectId": 1, "message": "어디 있었습니까?",
+        })
+        assert r.status_code == 200, r.text
+        assert r.json()["reply"] == "주방에 있었습니다."
+
+    def test_evaluate_success_returns_200(self, limited_client, monkeypatch, test_db,
+                                          full_case, evaluation_text):
+        from app import gemini
+
+        res = test_db["scenarios"].insert_one({"case_data": full_case})
+        monkeypatch.setattr(gemini, "call_gemini", lambda *a, **k: evaluation_text)
+
+        r = limited_client.post("/api/game/evaluate", json={
+            "scenarioId": str(res.inserted_id),
+            "deductionData": {"culpritName": "김서준", "reasoning": "우산"},
+        })
+        assert r.status_code == 200, r.text
+        assert r.json()["grade"] == "A"
+
+    def test_admin_login_success_returns_200(self, limited_client, monkeypatch):
+        """이 엔드포인트에서 처음 500이 발견됐다."""
+        from app.config import get_settings
+
+        pw = get_settings().admin_password
+        if not pw:
+            pytest.skip("ADMIN_PASSWORD 미설정")
+        r = limited_client.post("/admin/login", json={"password": pw})
+        assert r.status_code == 200, r.text
+        assert r.json()["token"]
+
+    def test_limit_still_blocks(self, limited_client, monkeypatch, test_db, full_case):
+        """켠 상태에서 제한이 실제로 발동하는지 (메모리 저장소)."""
+        from app import gemini
+
+        res = test_db["scenarios"].insert_one({"case_data": full_case})
+        monkeypatch.setattr(gemini, "call_gemini", lambda *a, **k: "네.")
+
+        body = {"scenarioId": str(res.inserted_id), "suspectId": 1, "message": "질문"}
+        limit = parse_many(get_settings().rate_limit_chat)[0].amount
+        codes = [limited_client.post("/api/game/chat", json=body).status_code
+                 for _ in range(limit + 2)]
+        assert codes[:limit] == [200] * limit, codes
+        assert codes[limit:] == [429, 429], codes
+
+
 class TestDisabledInTests:
-    def test_limiter_disabled(self):
+    def test_limiter_disabled_by_default(self):
         """conftest가 끄지 않으면 pytest가 실제 예산 카운터를 소진한다."""
         assert limiter.enabled is False

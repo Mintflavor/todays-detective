@@ -19,9 +19,10 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from .. import db
+from ..auth import require_admin
 from ..models import DeleteResult, ScenarioCreate, ScenarioCreated, ScenarioListItem
 
 logger = logging.getLogger(__name__)
@@ -38,10 +39,12 @@ def _oid(raw: str) -> ObjectId:
 
 # 프론트엔드(app/lib/api.ts)가 후행 슬래시를 붙여 호출한다.
 # Lambda는 path.rstrip("/")로 양쪽을 모두 받았다. 307 리다이렉트를 피하려고 두 경로를 등록한다.
-@router.post("", status_code=201, response_model=ScenarioCreated)
-@router.post("/", status_code=201, response_model=ScenarioCreated, include_in_schema=False)
+@router.post("", status_code=201, response_model=ScenarioCreated,
+             dependencies=[Depends(require_admin)])
+@router.post("/", status_code=201, response_model=ScenarioCreated,
+             dependencies=[Depends(require_admin)], include_in_schema=False)
 def create_scenario(payload: ScenarioCreate) -> ScenarioCreated:
-    # TODO(Phase 5.2): X-API-Key 필요. 지금은 인증이 없어 쓰레기 데이터 삽입이 가능하다.
+    """관리자 전용. 게임의 사건 생성은 POST /api/game/start가 담당한다."""
     result = db.get_scenarios().insert_one(
         {
             "title": payload.title,
@@ -85,9 +88,12 @@ def list_scenarios(
     return [ScenarioListItem.model_validate(d) for d in docs]
 
 
-@router.get("/{scenario_id}")
+@router.get("/{scenario_id}", dependencies=[Depends(require_admin)])
 def get_scenario(scenario_id: str) -> dict[str, Any]:
-    """⚠️ 스포일러 원본을 그대로 반환한다. 관리자 전용 (Phase 5.3에서 인증 추가)."""
+    """⚠️ **정화되지 않은 원본**을 반환한다 (solution, isCulprit 포함).
+
+    관리자 인증 필수. 플레이어용 정화본은 GET /api/game/scenario/{id}다.
+    """
     doc = db.get_scenarios().find_one({"_id": _oid(scenario_id)})
     if not doc:
         raise HTTPException(status_code=404, detail="Not found")
@@ -95,9 +101,9 @@ def get_scenario(scenario_id: str) -> dict[str, Any]:
     return doc
 
 
-@router.delete("/{scenario_id}", response_model=DeleteResult)
+@router.delete("/{scenario_id}", response_model=DeleteResult,
+               dependencies=[Depends(require_admin)])
 def delete_scenario(scenario_id: str) -> DeleteResult:
-    # TODO(Phase 5.2): X-API-Key 필요. 지금은 누구나 삭제할 수 있다.
     result = db.get_scenarios().delete_one({"_id": _oid(scenario_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Not found")
