@@ -414,7 +414,7 @@ unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상�
 | ~~**2-A**~~ | ✅ 프로젝트 골격 — `requirements.txt`, `config.py`, `db.py`, `main.py`(`/healthz`), `Dockerfile` | 2.1, 2.7 |
 | ~~**2-B**~~ | ✅ 외부 연동 — `storage.py`(MinIO), `gemini.py`(텍스트 + §0-F 이미지 재작성), `prompts.py` 이식 | 2.2 |
 | ~~**2-C**~~ | ✅ 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
-| **2-D** | 게임 라우터 — `routers/game.py` 5개 엔드포인트 ← **가장 큼** | 2.4 |
+| ~~**2-D**~~ | ✅ 게임 라우터 — `routers/game.py` 5개 엔드포인트 (통합 검증 완료) | 2.4 |
 | **2-E** | CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
 | **2-F** | 회귀 테스트 — pytest 3종 + 컨테이너 기동 검증 | 2.8 |
 
@@ -470,7 +470,8 @@ server/
   `models.py` 설계 방침: **`case_data`는 엄격한 Pydantic 모델로 만들지 않는다.**
   LLM 생성 JSON이라 필드가 유동적이어서, 스키마를 강제하면 정상 시나리오까지 422로 튕긴다.
   `dict[str, Any]`로 통과시키고 검증은 게임 진행에 필요한 최소 조건만 한다.
-- [ ] 2.4 `routers/game.py` — **재작성이 아니라 이식**해야 할 부분:
+- [x] 2.4 `routers/game.py` — 이식 완료. 무료 검증 27건 + 실제 Gemini 통합 검증 통과 (§2-D)
+  이식 대상이었던 항목:
   - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성(**§0-F — `generateContent` + `imageConfig` 방식으로 재작성**) → Pillow 512px JPEG q80 축소 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
   - `chat`: `generate_suspect_prompt(suspect, world_setting, timeline_truth, evidence_list)` → `f"{system}\n\n[이전 대화]\n{history}\n\n탐정: {message}\n용의자:"`, 모델은 `GEMINI_CHAT_MODEL or GEMINI_MODEL`
   - `evaluate`: 정규식 3개와 폴백 문구를 **원문 유지**
@@ -483,6 +484,30 @@ server/
     ```
   - `feedback`: camelCase 수신 → snake_case 저장 매핑 10개 필드, 300자 제한
   - `scenario/{id}`: 정화본 반환 + `Cache-Control: no-store`
+#### §2-D. Phase 2-D 통합 검증 결과 (실제 Gemini 호출)
+
+| 항목 | 결과 |
+|---|---|
+| 사건 생성 소요 시간 | **31.4초** (NPM 300초 타임아웃 안에 충분히 들어온다) |
+| 생성된 사건 | "안개 낀 해안 저택의 비극" (살인), 용의자 3명 |
+| 초상화 | **3/3 생성** → MinIO 업로드, 각 512×512, 익명 GET 200 |
+| 스포일러 정화 | 응답 누출 **0건**. DB 원본에는 `solution`·`isCulprit`·`motive`·`trick` 보존 |
+| 진범 | DB에 정확히 1명. 클라이언트 응답에는 없음 |
+| 심문 | 정상 응답. 프롬프트의 "2문장 이내" 지침대로 동작 |
+| 평가 | 오답 지목 → `isCorrect=False`, 등급 `F`, **폴백이 아닌 실제 파싱 성공** |
+| 스포일러 규칙 | 실패한 추리의 `advice`에 진범 이름 **없음** (프롬프트 규칙 준수 확인) |
+| 정화 조회 | `Cache-Control: no-store` 적용 확인 |
+
+평가 파싱은 유료 호출 전에 무료 픅스처로 8가지 변형을 먼저 검증했다 — 대괄호 변형
+(`[GRADE: 등급]`), 등급이 같은 줄에 오는 경우, 등급 뒤에 설명이 붙는 경우, `[ADVICE]` 누락,
+형식 완전 이탈 시 `F` / "보고서 생성 실패" / "조언을 불러올 수 없습니다." 폴백.
+
+**검증 스크립트 자체의 버그 1건** — `dict(r.headers)`로 변환하면 헤더의 대소문자 무관 조회가
+사라져 `Cache-Control`이 없는 것처럼 보였다. 서버는 정상이었다. 스크립트를 수정했다.
+
+생성된 시나리오 1건과 초상화 3장은 **삭제하지 않고 보존**한다 — Phase 3에서 "지난 사건 기록"
+플로우를 검증할 첫 데이터다.
+
 - [ ] 2.5 `routers/scenarios.py` — 목록은 `{"case_data": 0}` projection, `page>=1`, `1<=limit<=50` 클램프 유지
 - [ ] 2.6 `routers/feedbacks.py` — 조회 시 snake→camel 역매핑 유지
 - [ ] 2.7 `Dockerfile` — `python:3.12-slim`, non-root 유저, `uvicorn --host 0.0.0.0 --port 8000`
