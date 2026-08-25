@@ -22,6 +22,18 @@ const nextConfig: NextConfig = {
   //   그래서 원격 초상화 <Image>에는 unoptimized를 지정했고, 덕분에 공개 도메인을
   //   빌드 타임에 박아넣을 필요도 없어졌다 (도메인이 바뀌어도 재빌드가 필요 없다).
 
+  experimental: {
+    // rewrite 프록시의 기본 타임아웃은 **30초**다
+    // (next/dist/server/lib/router-utils/proxy-request.js: `proxyTimeout || 30000`).
+    //
+    // 사건 생성은 Gemini 텍스트 1회 + 이미지 3장이라 30초를 넘나든다. 실측 31초.
+    // 기본값이면 api가 정상 완료했는데도 프록시가 socket hang up(ECONNRESET)으로
+    // 끊어 클라이언트에 500이 간다 — 비용은 이미 지불된 채로.
+    //
+    // NPM 쪽에도 proxy_read_timeout 300s가 필요하다 (nginx 기본 60초). 계획 §4-A 참조.
+    proxyTimeout: 300_000,
+  },
+
   async rewrites() {
     return [
       {

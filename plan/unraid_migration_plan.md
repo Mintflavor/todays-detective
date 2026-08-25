@@ -641,10 +641,10 @@ Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제
 `PUBLIC_ASSET_BASE_URL`을 바꾸고 그 3개 URL도 갱신해야 한다 (또는 해당 시나리오를 지우고
 새로 생성). 신규 생성분은 자동으로 새 도메인을 쓴다.
 
-### Phase 4 — unraid 배포 + NPM 설정
+### Phase 4 — unraid 배포 + NPM 설정 ✅ 완료 (2026-08-25)
 
-- [ ] 4.1 unraid **Docker Compose Manager** 플러그인에 스택 등록 (unraid는 swarm 미지원 — 단일 compose)
-- [ ] 4.2 네트워크 구성 — **단일 user-defined 네트워크 + docker0 포트 바인드** (§0-B)
+- [x] 4.1 unraid **Docker Compose Manager** 플러그인에 스택 등록 (unraid는 swarm 미지원 — 단일 compose)
+- [x] 4.2 네트워크 구성 — **단일 user-defined 네트워크 + docker0 포트 바인드** (§0-B)
   ```yaml
   networks:
     todays-detective-net:          # 스택 전체가 이 네트워크 하나만 사용
@@ -655,26 +655,80 @@ Phase 2-B~2-E에서 쓴 `verify_*.py` 스크립트는 pytest로 대체하고 제
     - `todays-detective-minio` → `172.17.0.1:9100:9000`
   - `todays-detective-api`, `todays-detective-mongo` → **포트 공개 없음**
   - ⚠️ 네트워크에 `internal: true`를 **쓰지 말 것** — api가 Gemini API로 나가는 egress가 막힌다
-- [ ] 4.3 `.env`를 `/mnt/user/appdata/todays-detective/compose/.env`에 배치, 권한 `600`
+- [x] 4.3 `.env`를 `/mnt/user/appdata/todays-detective/compose/.env`에 배치, 권한 `600`
   - `WEB_DOMAIN`, `CDN_DOMAIN`, `PUBLIC_ASSET_BASE_URL`, `ALLOWED_ORIGINS` 4곳의 `example.com`을 실제 도메인으로 교체
-- [ ] 4.3-b 기존 시나리오의 초상화 URL 갱신 (§3-A) — `cdn.detective.example.com` → 실제 도메인.
+- [x] 4.3-b 기존 시나리오의 초상화 URL 갱신 (§3-A) — `cdn.detective.example.com` → 실제 도메인.
   대상이 1건 3개 URL뿐이므로 `mongosh` 한 줄로 처리하거나 해당 시나리오를 삭제하고 새로 생성한다
-- [ ] 4.4 `docker compose up -d` → `docker exec todays-detective-web wget -qO- http://todays-detective-api:8000/healthz`로 내부 연결 확인
-- [ ] 4.5 포트 공개는 §0-B의 docker0 바인드 2개로 한정. `0.0.0.0` 바인드는 쓰지 않는다
-- [ ] 4.6 전 서비스 `restart: unless-stopped`, 이미지 태그 **고정** (`latest` 금지 — 재부팅 시 예고 없는 메이저 업그레이드 방지)
-- [ ] 4.7 백업 구성
+- [x] 4.4 `docker compose up -d` → `docker exec todays-detective-web wget -qO- http://todays-detective-api:8000/healthz`로 내부 연결 확인
+- [x] 4.5 포트 공개는 §0-B의 docker0 바인드 2개로 한정. `0.0.0.0` 바인드는 쓰지 않는다
+- [x] 4.6 전 서비스 `restart: unless-stopped`, 이미지 태그 **고정** (`latest` 금지 — 재부팅 시 예고 없는 메이저 업그레이드 방지)
+- [x] 4.7 백업 구성
   - unraid **CA Appdata Backup** 플러그인에 `todays-detective` 포함
   - `mongodump` 일일 cron (컨테이너 파일 백업만으로는 Mongo 정합성이 보장되지 않는다)
 
-#### NPM 설정 (직접 진행)
+#### §4-A. ⚠️ Next.js rewrite 프록시의 30초 타임아웃 (실제로 터진 문제)
+
+계획은 이 위험을 **NPM 탓으로 지목했지만 틀렸다.** 실제 범인은 Next.js였다.
+
+공개 도메인으로 첫 사건 생성을 시도했을 때 **정확히 30.09초에 HTTP 500**이 났다. 그런데
+api 로그를 보니 사건 생성은 **성공**했다 (초상화 3/3, DB 저장 완료). 끊은 쪽은 web이었다:
+
+```
+Failed to proxy http://todays-detective-api:8000/api/game/start Error: socket hang up
+  code: 'ECONNRESET'
+```
+
+원인은 Next의 rewrite 프록시 기본 타임아웃이다:
+
+```js
+// next/dist/server/lib/router-utils/proxy-request.js
+proxyTimeout: proxyTimeout === null ? undefined : proxyTimeout || 30000
+```
+
+사건 생성은 실측 25~31초로 이 경계를 넘나든다. **비용은 지불되고 사용자는 500을 받는**
+최악의 실패 모드다.
+
+**해결**: `next.config.ts`에 `experimental.proxyTimeout: 300_000`. 적용 후 공개 도메인 경유
+생성이 **HTTP 200 / 25.2초**로 통과했다. 런타임 반영은
+`.next/required-server-files.json`의 `config.experimental.proxyTimeout`로 확인한다.
+
+> 체인이 NPM → web(Next) → api 3단이므로 **타임아웃도 3곳을 봐야 한다.**
+> Next는 위처럼 해결했고, NPM 쪽 `proxy_read_timeout`은 아래 설정 항목을 참고한다.
+
+#### §4-B. Phase 4 검증 결과
+
+| 항목 | 결과 |
+|---|---|
+| DNS | `detective`·`cdn`·`mintflavor.ddns.net` 모두 `183.102.97.41` = unraid 공인 IP |
+| 라우터 포워딩 | 외부 80/443 → NPM(180/1443) 정상. Let's Encrypt 발급 완료 |
+| `https://detective.../` | 200, `Server: openresty` + `X-Powered-By: Next.js` |
+| `https://detective.../server/healthz` | 200 — **rewrite 프록시가 외부에서도 동작** |
+| `https://cdn.../` (버킷 루트) | **403** — 객체 목록 비공개 |
+| 초상화 공개 접근 | 200, 512×512, `Cache-Control: public, max-age=31536000, immutable` 유지 |
+| 공개 경유 사건 생성 | **200 / 25.2초** (§4-A 수정 후) |
+| 정화본 공개 조회 | 스포일러 누출 0건 |
+| 컨테이너 | 4개 running(healthy), `restart: unless-stopped`, 이미지 태그 고정 |
+| 공개 포트 | web·minio만 `172.17.0.1`에 바인드. api·mongo는 미공개 |
+| Compose Manager | indirect 모드, `autostart=true`, 서비스 5개 인식 |
+| mongodump 백업 | 스크립트 + User Scripts 등록(매일 04:30), **복원 리허설 통과** (`solution` 보존 확인) |
+
+**초상화 브라우저 렌더링 미확인** — 브라우저 패널이 표시되지 않아 뷰포트 높이가 0이었고,
+next/image의 `loading="lazy"`가 발동하지 않아 DOM `<img>`가 로드되지 않았다. 앱 문제가 아니며
+이미지 서빙 자체는 세 방법으로 확인했다: curl 200 / 페이지 내 `fetch()` 200 image/jpeg /
+`new Image()` 512×512 로드 성공. 실기기 확인은 남아 있다.
+
+**백업 스크립트 권한 주의** — `/boot`은 vfat이라 `chmod 755`가 먹지 않는다 (`.env`와 동일).
+User Scripts 플러그인은 `bash <script>`로 호출하므로 실행 비트가 없어도 동작한다.
+
+#### NPM 설정 (완료 — 사용자가 직접 구성)
 
 **프록시 호스트 2개만 만든다. `api`용 호스트는 만들지 않는다** (§3-3).
 
-**① 웹 — `detective.example.com`**
+**① 웹 — `detective.mintflavor.ddns.net`**
 
 | 탭 | 항목 | 값 |
 |---|---|---|
-| Details | Domain Names | `detective.example.com` |
+| Details | Domain Names | `detective.mintflavor.ddns.net` |
 | Details | Scheme | `http` |
 | Details | Forward Hostname | `172.17.0.1` |
 | Details | Forward Port | `3100` |
@@ -692,11 +746,11 @@ proxy_send_timeout    300s;
 proxy_read_timeout    300s;
 ```
 
-**② 이미지 — `cdn.detective.example.com`**
+**② 이미지 — `cdn.mintflavor.ddns.net`**
 
 | 탭 | 항목 | 값 |
 |---|---|---|
-| Details | Domain Names | `cdn.detective.example.com` |
+| Details | Domain Names | `cdn.mintflavor.ddns.net` |
 | Details | Scheme | `http` |
 | Details | Forward Hostname | `172.17.0.1` |
 | Details | Forward Port | `9100` |
@@ -705,7 +759,7 @@ proxy_read_timeout    300s;
 | SSL | Force SSL / HTTP/2 | ✅ |
 
 MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포함된다:
-`https://cdn.detective.example.com/todays-detective/portraits/<uuid>.jpg`
+`https://cdn.mintflavor.ddns.net/todays-detective/portraits/<uuid>.jpg`
 캐시 헤더는 업로드 시 객체에 이미 박히므로 NPM에서 추가 설정할 것이 없다.
 
 **Forward Hostname이 컨테이너명이 아니라 `172.17.0.1`인 이유**: NPM이 기본 `bridge`에 있어 컨테이너명 DNS를 쓸 수 없다. 상세와 대안 검토는 §0-B.
