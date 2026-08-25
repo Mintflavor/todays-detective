@@ -712,10 +712,12 @@ proxyTimeout: proxyTimeout === null ? undefined : proxyTimeout || 30000
 | Compose Manager | indirect 모드, `autostart=true`, 서비스 5개 인식 |
 | mongodump 백업 | 스크립트 + User Scripts 등록(매일 04:30), **복원 리허설 통과** (`solution` 보존 확인) |
 
-**초상화 브라우저 렌더링 미확인** — 브라우저 패널이 표시되지 않아 뷰포트 높이가 0이었고,
-next/image의 `loading="lazy"`가 발동하지 않아 DOM `<img>`가 로드되지 않았다. 앱 문제가 아니며
-이미지 서빙 자체는 세 방법으로 확인했다: curl 200 / 페이지 내 `fetch()` 200 image/jpeg /
-`new Image()` 512×512 로드 성공. 실기기 확인은 남아 있다.
+**초상화 브라우저 렌더링 — 사용자 확인 완료.** 자동 검증 시점에는 브라우저 패널이 표시되지
+않아 뷰포트 높이가 0이었고, next/image의 `loading="lazy"`가 발동하지 않아 DOM `<img>`가
+로드되지 않았다 (앱 문제가 아니라 검증 환경 제약). 서빙 자체는 curl 200 / 페이지 내
+`fetch()` 200 image/jpeg / `new Image()` 512×512 로드로 확인했고, 실제 브라우저에서
+정상 렌더링됨을 사용자가 확인했다. `unoptimized` + `remotePatterns` 미설정 조합이
+의도대로 동작한다.
 
 **백업 스크립트 권한 주의** — `/boot`은 vfat이라 `chmod 755`가 먹지 않는다 (`.env`와 동일).
 User Scripts 플러그인은 `bash <script>`로 호출하므로 실행 비트가 없어도 동작한다.
