@@ -741,12 +741,22 @@ User Scripts 플러그인은 `bash <script>`로 호출하므로 실행 비트가
 | Advanced | Custom Nginx Configuration | 아래 블록 |
 
 ```nginx
-# 사건 생성은 Gemini 텍스트 1회 + Imagen 3장이라 수십 초가 걸린다.
+# 사건 생성은 Gemini 텍스트 1회 + 초상화 3장이라 수십 초가 걸린다.
 # NPM 기본 60초로는 /server/api/game/start 가 502로 끊긴다.
 proxy_connect_timeout 60s;
 proxy_send_timeout    300s;
 proxy_read_timeout    300s;
 ```
+
+> **✅ 2026-08-25 적용 확인.** 파일 존재만이 아니라 **로드까지** 검증했다:
+> `proxy_host/7.conf` 수정 시각 20:59:46 < nginx worker 시작 21:00:39 → reload가 반영됐다.
+> (`docker top <npm> -o pid,lstart,args`로 worker 시작 시각을 본다. reload는 master를
+> 재시작하지 않고 worker만 교체하므로, master 시각으로 판단하면 틀린다.)
+>
+> **server 블록 레벨에 들어가야 한다.** NPM은 Advanced 내용을 `server` 안, `location /`
+> **밖**에 넣는다. `location`이 include하는 `conf.d/include/proxy.conf`에는 타임아웃
+> 지시자가 없어 상속이 깨지지 않는다 — 만약 거기에 있었다면 location 레벨이 이겨서
+> 이 설정이 무시된다. NPM 버전을 올린 뒤에는 `proxy.conf`를 다시 확인할 것.
 
 **② 이미지 — `cdn.mintflavor.ddns.net`**
 
