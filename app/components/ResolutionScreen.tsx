@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle, Archive } from 'lucide-react';
 import { Evaluation, CaseData, DeductionInput } from '../types/game';
 import { submitFeedback } from '../lib/api';
 
@@ -15,11 +15,13 @@ interface ResolutionScreenProps {
   caseData: CaseData;
   deductionInput?: DeductionInput;
   onReset: () => void;
+  /** 새 사건 생성(159원·횟수 제한)을 거치지 않는 경로. */
+  onGoToArchive: () => void;
 }
 
 const FEEDBACK_MAX_LENGTH = 300;
 
-export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset }: ResolutionScreenProps) {
+export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset, onGoToArchive }: ResolutionScreenProps) {
   const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
   const [showBriefing, setShowBriefing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -213,6 +215,12 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
             className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-12 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
           >
             <RefreshCw size={20} /> 새로운 사건 맡기
+          </button>
+          <button
+            onClick={onGoToArchive}
+            className="w-full md:w-auto bg-gray-800 hover:bg-gray-700 text-gray-200 py-4 px-8 rounded-sm font-bold shadow-lg border border-gray-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
+          >
+            <Archive size={20} /> 지난 사건 맡기
           </button>
           <button
             onClick={() => setShowFeedback(true)}

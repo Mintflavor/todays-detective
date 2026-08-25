@@ -25,7 +25,7 @@ export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }
       </div>
 
       {/* Sound Toggle (Absolute) */}
-      <button onClick={toggleMute} className="absolute top-6 right-6 p-2 bg-gray-800/80 backdrop-blur-sm rounded-full hover:bg-gray-700 transition-colors z-50 border border-gray-700">
+      <button onClick={toggleMute} aria-label={isMuted ? "배경음 켜기" : "배경음 끄기"} className="absolute top-6 right-6 p-3 bg-gray-800/80 backdrop-blur-sm rounded-full hover:bg-gray-700 transition-colors z-50 border border-gray-700">
         {isMuted ? <VolumeX size={20} className="text-gray-400" /> : <Volume2 size={20} className="text-amber-500" />}
       </button>
 
@@ -69,7 +69,7 @@ export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }
       
       {/* Copyright Footer */}
       <footer className="absolute bottom-4 w-full text-center text-[10px] text-gray-500/50 font-mono z-10">
-        <p>&copy; 2025 Hyunil Park. All Rights Reserved.</p>
+        <p>&copy; 2025-2026 Hyunil Park. All Rights Reserved.</p>
       </footer>
     </div>
   );

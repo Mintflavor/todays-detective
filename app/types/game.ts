@@ -82,5 +82,19 @@ export interface Evaluation {
   caseNumber?: string;
 }
 
+/**
+ * 플레이어에게 보여줄 오류.
+ *
+ * `retry`가 없으면 재시도 버튼을 만들지 않는다 — 레이트 리밋처럼 다시 눌러도
+ * 실패가 확정된 경우가 있다. `secondary`는 대안 경로(예: 기록실)다.
+ * 오류 화면에 나갈 길이 없으면 게임이 멈추므로 최소 한 가지 행동은 항상 제공한다.
+ */
+export interface GameError {
+  message: string;
+  title?: string;
+  retry?: () => void;
+  secondary?: { label: string; action: () => void };
+}
+
 export type GamePhase = 'intro' | 'load_menu' | 'tutorial' | 'loading' | 'briefing' | 'investigation' | 'deduction' | 'resolution';
 export type LoadingType = 'case' | 'deduction';

@@ -29,6 +29,33 @@ export function errorMessage(body: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * HTTP 상태를 들고 다니는 에러.
+ *
+ * 호출부가 429(레이트 리밋)와 그 외를 구분해야 한다. 예산 상한에 걸린 것과
+ * 통신이 끊긴 것은 플레이어가 취할 행동이 정반대다 — 전자는 기록실로 가면 되고
+ * 후자는 재시도하면 된다. 문구를 뭉개면 출구를 안내할 수 없다.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+
+  /** 레이트 리밋. 재시도는 무의미하고 기록실로 유도해야 한다. */
+  get isRateLimited(): boolean {
+    return this.status === 429;
+  }
+
+  /** 클라이언트가 자체적으로 끊은 경우 (타임아웃/취소). 서버 작업은 계속될 수 있다. */
+  get isAborted(): boolean {
+    return this.status === 0;
+  }
+}
+
 /** 응답 본문을 JSON으로 읽는다. 본문이 없거나 JSON이 아니면 빈 객체를 준다. */
 export async function readJson(res: Response): Promise<unknown> {
   try {

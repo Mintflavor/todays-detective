@@ -1,6 +1,12 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 import React, { useRef, useEffect, KeyboardEvent, ChangeEvent } from 'react';
 import Image from 'next/image';
-import { Volume2, VolumeX, Timer, Clock, AlertTriangle, Notebook, User, Send } from 'lucide-react';
+import { Volume2, VolumeX, Timer, Clock, AlertTriangle, Notebook, User, Send, Zap } from 'lucide-react';
 import { CaseData, ChatLogs } from '../types/game';
 import { formatTime } from '../lib/utils';
 
@@ -10,6 +16,7 @@ interface InvestigationScreenProps {
   setCurrentSuspectId: (id: number) => void;
   chatLogs: ChatLogs;
   actionPoints: number;
+  totalActionPoints: number;
   timerSeconds: number;
   isOverTime: boolean;
   showTimeOverModal: boolean;
@@ -32,6 +39,7 @@ export default function InvestigationScreen({
   setCurrentSuspectId,
   chatLogs,
   actionPoints,
+  totalActionPoints,
   timerSeconds,
   isOverTime,
   showTimeOverModal,
@@ -66,7 +74,7 @@ export default function InvestigationScreen({
   }, [isTyping, currentSuspectId, actionPoints]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100 font-sans overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] bg-gray-950 text-gray-100 font-sans overflow-hidden relative">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -103,7 +111,7 @@ export default function InvestigationScreen({
                   <h3 className="font-bold text-red-800 text-xs uppercase tracking-widest mb-2">본부 지침 (Penalty)</h3>
                   <p className="text-sm leading-relaxed text-gray-900">
                     수사는 계속 진행할 수 있으나,<br/>
-                    최종 평가 등급은 <span className="font-bold text-red-700 underline">최대 'B'등급</span>으로 제한됩니다.
+                    최종 평가 등급은 <span className="font-bold text-red-700 underline">최대 &lsquo;B&rsquo;등급</span>으로 제한됩니다.
                   </p>
                 </div>
               </div>
@@ -124,12 +132,12 @@ export default function InvestigationScreen({
       <header className="bg-gray-900/95 backdrop-blur-sm p-3 border-b border-gray-800 shadow-md flex justify-between items-center z-20 shrink-0">
         <div className="flex flex-col min-w-0">
           <h2 className="font-serif font-bold text-amber-600 text-base text-left">{caseData.title}</h2>
-          <button onClick={onGoToBriefing} className="text-[10px] text-gray-500 hover:text-gray-300 underline text-left shrink-0">서류 다시보기</button>
+          <button onClick={onGoToBriefing} className="text-[11px] text-gray-400 hover:text-gray-200 underline text-left shrink-0 py-2 -my-1 min-h-[32px]">서류 다시보기</button>
         </div>
         
         <div className="flex items-center gap-3">
           {/* Volume Control */}
-          <button onClick={toggleMute} className="p-1.5 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors">
+          <button onClick={toggleMute} aria-label={isMuted ? "배경음 켜기" : "배경음 끄기"} className="p-2.5 bg-gray-800 rounded-full hover:bg-gray-700 transition-colors">
             {isMuted ? <VolumeX size={14} className="text-gray-400" /> : <Volume2 size={14} className="text-amber-500" />}
           </button>
 
@@ -139,12 +147,12 @@ export default function InvestigationScreen({
           </div>
 
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold font-mono transition-colors ${actionPoints <= 5 ? 'bg-red-900/50 text-red-400 border border-red-800 animate-pulse' : 'bg-gray-800 text-amber-500 border border-amber-900'}`}>
-            <Clock size={12} /> 
-            <span>{actionPoints}</span>
+            <Zap size={12} />
+            <span>{actionPoints} / {totalActionPoints}</span>
           </div>
           <button 
             onClick={onGoToDeduction}
-            className="bg-red-800 hover:bg-red-700 text-white text-[10px] px-3 py-2 rounded-sm font-bold tracking-wider transition-colors shadow-sm"
+            className="bg-red-800 hover:bg-red-700 text-white text-[11px] px-3 min-h-[44px] rounded-sm font-bold tracking-wider transition-colors shadow-sm whitespace-nowrap"
           >
             범인 지목
           </button>
@@ -154,7 +162,7 @@ export default function InvestigationScreen({
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#111827]/30 flex flex-col items-center relative z-10">
         <div className="w-full max-w-2xl flex flex-col space-y-4">
-          {chatLogs[currentSuspectId].map((msg, idx) => (
+          {(chatLogs[currentSuspectId] ?? []).map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' || msg.role === 'note' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'} animate-fade-in`}>
               {msg.role === 'system' ? (
                 <div className="bg-gray-800/80 backdrop-blur-md text-gray-400 text-xs px-4 py-1.5 rounded-full border border-gray-700/50 my-2 text-center max-w-[90%] whitespace-pre-wrap leading-relaxed shadow-sm">
@@ -249,10 +257,11 @@ export default function InvestigationScreen({
               onKeyDown={handleKeyDown}
               placeholder={actionPoints <= 0 && currentSuspectId !== 0 ? "행동력이 소진되어 더 이상 심문할 수 없습니다." : inputPlaceholder}
               disabled={currentSuspectId !== 0 && (actionPoints <= 0 || isTyping)}
-              className="flex-1 bg-gray-950/50 border border-gray-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-amber-700 placeholder-gray-600 font-sans text-sm transition-all backdrop-blur-sm"
+              className="flex-1 bg-gray-950/50 border border-gray-700 rounded-md px-4 py-3 text-white focus:outline-none focus:border-amber-700 placeholder-gray-600 font-sans text-base transition-all backdrop-blur-sm"
             />
-            <button 
+            <button
               onClick={handleSendMessage}
+              aria-label={currentSuspectId === 0 ? "메모 저장" : "질문 전송"}
               disabled={currentSuspectId !== 0 && (actionPoints <= 0 || isTyping || !userInput.trim())}
               className={`p-3 rounded-md transition-colors shadow-lg ${
                 currentSuspectId === 0 
