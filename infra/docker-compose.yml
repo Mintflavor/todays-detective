@@ -5,7 +5,8 @@
 # Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
 #
 # Today's Detective — unraid 스택
-# Phase 1: 데이터 계층 (mongo, minio). api/web은 Phase 2~3에서 추가된다.
+# Phase 1: 데이터 계층 (mongo, minio)
+# Phase 2: api (FastAPI). web은 Phase 3에서 추가된다.
 #
 # 배치 위치 : /mnt/user/appdata/todays-detective/compose/docker-compose.yml
 # 시크릿    : 같은 디렉터리의 .env (권한 600). /boot은 vfat이라 권한이 없어 쓰지 않는다.
@@ -87,6 +88,44 @@ services:
       - /mnt/user/appdata/todays-detective/minio-init:/opt/init:ro
     networks:
       - todays-detective-net
+
+  # ───────────────────────────── API ───────────────────────────────
+  todays-detective-api:
+    container_name: todays-detective-api
+    build:
+      context: ../server           # /mnt/user/appdata/todays-detective/server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 포트를 공개하지 않는다 — web의 same-origin rewrite로만 접근한다. (계획 §3-3)
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: todays_detective
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL}
+      IMAGE_MODEL: ${IMAGE_MODEL}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      PUBLIC_ASSET_BASE_URL: ${PUBLIC_ASSET_BASE_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      API_KEY_ADMIN: ${API_KEY_ADMIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      LOG_LEVEL: INFO
+    depends_on:
+      todays-detective-mongo:
+        condition: service_healthy
+      todays-detective-minio:
+        condition: service_healthy
+    networks:
+      - todays-detective-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
 
 networks:
   # 단일 user-defined 네트워크. 컨테이너명 DNS는 스택 내부에서만 필요하다.

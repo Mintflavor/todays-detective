@@ -294,14 +294,48 @@ for part in resp.candidates[0].content.parts:
 | 용량 | 약 866 KB |
 | 토큰 사용 | prompt 11 + image out 1,120 = 1,516 |
 
-**추가 문제: 반환 이미지가 정사각형이 아니다.** 기존 리사이즈 코드는
-[lambda/s3_upload.py](../lambda/s3_upload.py)의 `img.resize((size, size))`로 **크롭 없이 강제 축소**한다 →
-768×1344를 512×512로 만들면 인물이 가로로 찌그러진다.
+**종횡비는 `imageConfig`로 직접 지정한다 — 크롭 불필요 (확정)**
 
-Phase 2 대응:
-1. `imageConfig.aspectRatio: "1:1"` 지원 여부를 **1회만** 확인한다 (비용 절약)
-2. 지원하든 안 하든 **center-crop 후 resize**로 바꾼다 — 어떤 종횡비가 와도 안전한 유일한 방법이다
-3. 환경변수명 `IMAGEN_MODEL` → `IMAGE_MODEL`로 정리 (더 이상 Imagen이 아니다)
+종횡비를 지정하지 않으면 768×1344 세로 이미지가 온다. 그대로 `img.resize((512, 512))`하면
+인물이 가로로 찌그러지고, center-crop으로 잘라내면 머리나 상체가 날아간다. 둘 다 답이 아니다.
+
+정답은 **요청 시점에 1:1을 명시**하는 것이다. 실측으로 확정한 필드 형태:
+
+```json
+{
+  "contents": [{ "parts": [{ "text": "<프롬프트>" }] }],
+  "generationConfig": {
+    "responseModalities": ["IMAGE"],
+    "imageConfig": { "aspectRatio": "1:1", "imageSize": "1K" }
+  }
+}
+```
+
+Python SDK에서는 `config=types.GenerateContentConfig(response_modalities=["IMAGE"],
+image_config=types.ImageConfig(aspect_ratio="1:1", image_size="1K"))`.
+
+| 항목 | 확정 값 |
+|---|---|
+| `aspectRatio` 유효값 | `1:1`, `1:4`, `1:8`, `2:3`, `3:2`, `3:4`, `4:1`, `4:3`, `4:5`, `5:4`, `8:1`, `9:16`, `16:9`, `21:9` |
+| `imageSize` 유효값 (API 전체) | `1K`, `2K`, `4K`, `512`, `512P`, `512PX` |
+| `imageSize` — 이 모델에서 실제 사용 가능 | **`1K`만.** `512`·`512P`·`512PX`는 `Image size ... is not supported for this model`로 거부된다 (512px는 Flash Image 전용, 우리는 Flash **Lite** Image) |
+| 1:1 + 1K 결과 | **1024 × 1024 JPEG**, 약 921 KB, image out 1,120 토큰 |
+
+→ **Pillow은 1024→512 균등 축소만 하면 된다.** 크롭도, 왜곡 보정도 필요 없다.
+기존 `s3_upload.py`의 `img.resize((size, size))` 로직을 그대로 쓸 수 있다 (입력이 정사각형이므로).
+
+존재하지 않는 형태 (문서 요약이 잘못 안내한 것들 — 시도하지 말 것):
+- `response_format: {...}` → `Unknown name "response_format"`
+- `generationConfig.aspectRatio` (평평한 배치) → `Unknown name "aspectRatio" at 'generation_config'`
+
+> **비용 없이 API 스펙을 알아내는 방법** — 일부러 잘못된 enum 값을 보내면 생성 전에 400으로 거부되며
+> 에러 메시지에 유효값 목록이 담겨 온다. 토큰이 소비되지 않는다. 문서가 애매할 때 이 방법을 먼저 쓴다.
+
+**환경변수명**: `IMAGEN_MODEL` → `IMAGE_MODEL`로 정리한다 (더 이상 Imagen이 아니다).
+
+**⚠️ `google-genai` 버전**: `lambda/requirements.txt`가 `google-genai==0.3.0`(2024년 말)으로 고정돼 있다.
+`types.ImageConfig`도, Gemini 3 이미지 모델도 지원하지 않는 버전이다. 최신은 **2.19.0** —
+Phase 2 `server/requirements.txt`에서 반드시 올려야 한다.
 
 ### Phase 1 — 데이터 계층 부팅 ✅ 완료 (2026-08-25)
 
@@ -339,6 +373,17 @@ unraid에 직접 배포하여 검증했다. 산출물은 [`infra/`](../infra/), 
 unraid **Docker → Compose** 탭에서 Start/Stop/Update가 가능하다. 상세는 [infra/README.md](../infra/README.md).
 
 ### Phase 2 — FastAPI 서비스 작성 (가장 큰 작업)
+
+**단계별로 진행한다.** 각 단계 완료 후 확인을 받고 다음으로 넘어간다.
+
+| 단계 | 내용 | 대응 항목 |
+|---|---|---|
+| **2-A** | 프로젝트 골격 — `requirements.txt`, `config.py`, `db.py`, `main.py`(`/healthz`), `Dockerfile` | 2.1, 2.7 |
+| **2-B** | 외부 연동 — `storage.py`(MinIO), `gemini.py`(텍스트 + **§0-F 이미지 재작성**), `prompts.py` 이식 | 2.2 |
+| **2-C** | 데이터 계약 — `sanitize.py`(스포일러 정화), `models.py`(Pydantic) | 2.3 |
+| **2-D** | 게임 라우터 — `routers/game.py` 5개 엔드포인트 ← **가장 큼** | 2.4 |
+| **2-E** | CRUD 라우터 — `routers/scenarios.py`, `routers/feedbacks.py` | 2.5, 2.6 |
+| **2-F** | 회귀 테스트 — pytest 3종 + 컨테이너 기동 검증 | 2.8 |
 
 새 디렉터리 `server/`를 만들고 `lambda/`의 검증된 로직을 이식한다.
 
@@ -380,7 +425,7 @@ server/
   _SPOILER_SUSPECT_FIELDS = ("isCulprit", "secret", "real_action", "motive", "trick")
   ```
 - [ ] 2.4 `routers/game.py` — **재작성이 아니라 이식**해야 할 부분:
-  - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성(**§0-F — 코드 재작성 필요**) → Pillow center-crop 후 512px JPEG q80 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
+  - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성(**§0-F — `generateContent` + `imageConfig` 방식으로 재작성**) → Pillow 512px JPEG q80 축소 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
   - `chat`: `generate_suspect_prompt(suspect, world_setting, timeline_truth, evidence_list)` → `f"{system}\n\n[이전 대화]\n{history}\n\n탐정: {message}\n용의자:"`, 모델은 `GEMINI_CHAT_MODEL or GEMINI_MODEL`
   - `evaluate`: 정규식 3개와 폴백 문구를 **원문 유지**
     ```python
