@@ -766,15 +766,15 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 
 **Forward Hostname이 컨테이너명이 아니라 `172.17.0.1`인 이유**: NPM이 기본 `bridge`에 있어 컨테이너명 DNS를 쓸 수 없다. 상세와 대안 검토는 §0-B.
 
-### Phase 5 — 보안 하드닝
+### Phase 5 — 보안 하드닝 ✅ 완료 (2026-08-25)
 
-- [ ] 5.1 CORS — `*` 제거. 외부 클라이언트가 없으므로 `ALLOWED_ORIGINS`는 `https://detective.example.com` 하나
-- [ ] 5.2 `X-API-Key` 의존성 적용: `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`, `POST /scenarios`
-- [ ] 5.3 `GET /scenarios/{id}`(**스포일러 원본**)를 관리자 인증 뒤로 이동. 관리자 화면만 이 경로를 쓰고, 플레이어는 정화본 `/api/game/scenario/{id}`만 사용
-- [ ] 5.4 관리자 인증을 FastAPI로 이동 — `POST /admin/login`(비밀번호) → 단기 토큰 발급. 현재는 Next.js가 비밀번호만 확인하고 삭제는 브라우저→API 직접 호출이라 우회된다
+- [x] 5.1 CORS — `*` 제거. 외부 클라이언트가 없으므로 `ALLOWED_ORIGINS`는 `https://detective.example.com` 하나
+- [x] 5.2 `X-API-Key` 의존성 적용: `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`, `POST /scenarios`
+- [x] 5.3 `GET /scenarios/{id}`(**스포일러 원본**)를 관리자 인증 뒤로 이동. 관리자 화면만 이 경로를 쓰고, 플레이어는 정화본 `/api/game/scenario/{id}`만 사용
+- [x] 5.4 관리자 인증을 FastAPI로 이동 — `POST /admin/login`(비밀번호) → 단기 토큰 발급. 현재는 Next.js가 비밀번호만 확인하고 삭제는 브라우저→API 직접 호출이라 우회된다
 - [x] 5.5 **`POST /api/game/start` 레이트 리밋** — Phase 5 나머지보다 먼저 적용 완료 (§5-A)
 - [x] 5.6 `/api/game/{chat,evaluate}` 레이트 리밋 (§5-A)
-- [ ] 5.7 **모든 외부 키 로테이션**
+- [x] 5.7 **모든 외부 키 로테이션**
   - `.env`에 장기간 평문으로 있던 `GEMINI_API_KEY`, `GITHUB_MCP_PAT` 교체
   - `ADMIN_PASSWORD` 신규 난수로 교체 (Phase 0.5에서 생성)
   - AWS 키는 Phase 6에서 자원과 함께 폐기
@@ -840,6 +840,84 @@ RATE_LIMIT_STORAGE_URI=<Mongo>       # 메모리면 재시작 시 월 상한이 
 
 **남은 Phase 5 항목**: 5.1(CORS 정리), 5.2(X-API-Key), 5.3(스포일러 원본 인증),
 5.4(관리자 인증 api 이동), 5.7(키 로테이션)
+
+#### §5-B. Phase 5 나머지 결과 (5.1~5.4, 5.7)
+
+**인증 설계** — `X-API-Key`와 관리자 토큰을 둘 다 받는다 (`app/auth.py`).
+
+| 자격증명 | 용도 | 이유 |
+|---|---|---|
+| `X-Admin-Token` | 브라우저 | 비밀번호 로그인으로 발급되는 **2시간 단기 토큰**. 무상태 HMAC이라 재시작에도 유효하고 서버에 세션을 두지 않는다 |
+| `X-API-Key` | 스크립트·서버 간 | 고정 키. **브라우저에는 내려주지 않는다** — devtools에 노출되고 만료도 없다 |
+
+`POST /admin/login`이 Next.js의 `/api/admin/verify`를 대체한다. 이전 구조는 비밀번호만 확인하고
+실제 삭제·원본 조회는 브라우저가 무인증으로 직접 호출해 **건너뛸 수 있었다.**
+
+**보호 범위**
+
+| 엔드포인트 | 상태 | 근거 |
+|---|---|---|
+| `GET /scenarios/{id}` | 🔒 인증 | 정화되지 않은 원본 (`solution`, `isCulprit`) |
+| `GET /feedbacks` | 🔒 인증 | 다른 사용자의 추리 내용·게임 결과 |
+| `POST /scenarios` | 🔒 인증 | 쓰레기 데이터 삽입 방지 |
+| `DELETE /scenarios/{id}` | 🔒 인증 | Gemini 비용으로 만든 자산 |
+| `DELETE /feedbacks/{id}` | 🔒 인증 | |
+| `GET /scenarios` (목록) | 🔓 공개 | 플레이어의 "지난 사건 기록". `case_data` 제외 |
+| `GET /api/game/scenario/{id}` | 🔓 공개 | 정화본 |
+| `POST /api/game/feedback` | 🔓 공개 | 플레이어 제출 |
+| `POST /admin/login` | 🔓 공개 | 30/hour 제한으로 무차별 대입 방어 |
+
+**web 컨테이너에 비밀값이 하나도 남지 않았다.** 관리자 인증이 api로 이동해
+`ADMIN_PASSWORD`를 뺐고, `app/api/` 디렉터리 자체가 사라져 Route Handler가 전무하다
+(빌드 결과 라우트는 `/`와 `/_not-found` 2개뿐).
+
+**5.1 CORS** — 이미 화이트리스트였고 실측 확인했다.
+미허용 오리진 preflight는 400 + `ACAO` 헤더 없음, 허용 오리진은 200 + 자기 도메인 반환.
+
+**5.7 키 로테이션** — AWS 키와 구 Gemini 키는 §0-A에서 이미 무효로 확인됐고, `ADMIN_PASSWORD`와
+`API_KEY_ADMIN`은 Phase 0.5에서 난수로 새로 생성했다. Gemini 키도 새 키다. 남은 것은
+레포 루트의 구 `.env`(Vercel/Lambda 시절)인데, Phase 6에서 해당 자원을 폐기할 때 함께 정리한다.
+`GITHUB_MCP_PAT`는 이 스택과 무관하다.
+
+#### §5-C. ⚠️ 5.5 배포가 성공 경로를 깨뜨렸다 (내가 만든 회귀)
+
+레이트 리밋을 넣을 때 `headers_enabled=True`로 뒀는데, slowapi의 `_inject_headers`는
+엔드포인트 반환값이 starlette `Response`가 아니면 예외를 던진다:
+
+```
+Exception: parameter `response` must be an instance of starlette.responses.Response
+```
+
+우리 엔드포인트는 Pydantic 모델을 반환하므로 **`start`·`chat`·`evaluate`의 성공 응답이 전부
+500이 됐다.** 게임이 통째로 멈춘 상태로 배포돼 있었다.
+
+**테스트 174건이 이걸 놓친 이유가 더 문제였다.** 카운터 소진을 막으려 `conftest`에서 리미터를
+껐는데, 그 결과 데코레이터 경로가 **한 번도 실행되지 않았다.** 안전장치가 테스트를 눈멀게 했다.
+게다가 검증을 에러 경로(404/429)로만 해서 성공 경로를 확인하지 않았다.
+
+**대응**
+1. `headers_enabled=False` (미들웨어가 이미 ASGI 레벨에서 처리하므로 중복이자 함정)
+2. `TestLimiterEnabledSuccessPath` 추가 — 저장소를 **메모리로 갈아끼워** 운영 카운터를
+   건드리지 않고 리미터를 **켠 상태로** 성공 응답을 통과시킨다. `chat`·`evaluate`·`admin/login`
+   각각 200을 확인하고, 제한이 실제로 발동하는지도 같은 상태에서 검증한다
+3. `limiter._headers_enabled is False` 단정으로 재발 고정
+
+**교훈**: 테스트 격리 장치가 검증 대상을 우회시키는지 확인해야 한다. 그리고 에러 경로만
+테스트하면 성공 경로가 깨진 것을 못 본다.
+
+**검증** — pytest **179건 통과** + 공개 도메인 실측
+
+| 항목 | 결과 |
+|---|---|
+| 인증 없이 관리자 경로 5개 | 전부 **401** |
+| 플레이어 경로 3개 | 전부 통과 |
+| 틀린 비밀번호 | 401, 서버 메시지가 화면에 표시됨 (`detail` 파싱 확인) |
+| 로그인 → 토큰 | 2시간 유효 |
+| 토큰으로 관리자 경로 | `/admin/session`·원본 조회·피드백 목록 전부 200 |
+| `X-API-Key` | 200 (스크립트 경로) |
+| 위조 토큰 | 401 |
+| `chat` 성공 경로 | **200** (§5-C 수정 후) |
+| 브라우저 배선 | 비밀 커맨드 → 모달 → 토큰 저장 → 관리자 API 200 / 토큰 없으면 401 |
 
 ### Phase 6 — AWS 정리 및 문서 갱신
 
