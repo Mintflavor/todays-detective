@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import db, storage
+from .routers import game
 from .config import get_settings
 
 settings = get_settings()
@@ -72,7 +73,8 @@ def healthz():
     }
 
 
-# 라우터는 후속 단계에서 등록한다.
-#   2-D: routers/game.py       → /api/game/*
+app.include_router(game.router)
+
+# 라우터는 후속 단계에서 추가한다.
 #   2-E: routers/scenarios.py  → /scenarios
 #        routers/feedbacks.py  → /feedbacks
