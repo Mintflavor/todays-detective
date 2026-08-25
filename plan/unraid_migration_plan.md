@@ -337,6 +337,39 @@ image_config=types.ImageConfig(aspect_ratio="1:1", image_size="1K"))`.
 `types.ImageConfig`도, Gemini 3 이미지 모델도 지원하지 않는 버전이다. 최신은 **2.19.0** —
 Phase 2 `server/requirements.txt`에서 반드시 올려야 한다.
 
+#### §0-G. 512×512를 직접 받을 수 있는가 — 가능하지만 33% 더 비싸다
+
+"1K로 받아 축소하지 말고 처음부터 512로 받자"를 실측 검증했다. **기술적으로는 된다.**
+단 512px를 지원하는 모델이 `gemini-3.1-flash-image`(**non-lite**)뿐이고, 이 모델의
+이미지 출력 단가가 lite의 **2배**여서 총액은 오히려 올라간다.
+
+| | `gemini-3.1-flash-lite-image` @ `1K` | `gemini-3.1-flash-image` @ `512` |
+|---|---|---|
+| 반환 크기 | 1024×1024 (921 KB) | **512×512** (275 KB) |
+| image out 토큰 | 1,120 | **747** (−33%) |
+| 이미지 출력 단가 | **$30 / 1M 토큰** | $60 / 1M 토큰 (2배) |
+| **장당 비용** | **$0.0336** | **$0.0448 (+33%)** |
+| 사건 1건(3장) | **$0.101** | $0.134 |
+| Pillow 축소 | 필요 (1024→512 균등) | 불필요 |
+
+토큰은 33% 줄지만 단가가 2배라 **결과적으로 33% 더 비싸다.** 월 5,000원(약 $3.4) 한도에서는
+사건 생성 가능 횟수가 약 33건 → 약 25건으로 줄어든다.
+
+**결정: `gemini-3.1-flash-lite-image` @ `1K` 유지 + Pillow로 512 축소.**
+
+부수 근거:
+- 1024→512 축소는 **균등 축소**라 왜곡이 없다 (§0-F). 크롭도 아니다
+- 다운샘플링은 안티에일리어싱이 걸려 네이티브 512 렌더보다 오히려 선명한 경우가 많다
+- 1K 원본(921 KB)은 api 컨테이너 메모리에만 머물고, MinIO에는 축소본만 올라간다.
+  Google→api 구간 전송량은 비용에 영향이 없다
+- 512는 `gemini-3.1-flash-lite-image`에서 거부된다 (`not supported for this model`).
+  lite 모델로는 애초에 선택지가 없다
+
+참고 — 확인한 이미지 모델 6종: `gemini-2.5-flash-image`, `gemini-3-pro-image`,
+`gemini-3-pro-image-preview`, `gemini-3.1-flash-image`, `gemini-3.1-flash-image-preview`,
+`gemini-3.1-flash-lite-image`. 이 중 `gemini-3.1-flash-lite-image`가 장당 최저가다
+(`gemini-2.5-flash-image`는 1,290토큰 @ $30/1M = $0.039).
+
 ### Phase 1 — 데이터 계층 부팅 ✅ 완료 (2026-08-25)
 
 unraid에 직접 배포하여 검증했다. 산출물은 [`infra/`](../infra/), 배포 절차는 [infra/README.md](../infra/README.md).
