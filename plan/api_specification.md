@@ -1,5 +1,11 @@
 # Today's Detective API 명세서
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> AWS Lambda 시절의 API 명세다. 엔드포인트 경로는 대부분 유지되지만 인증·레이트 리밋이 추가됐다.
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 이 문서는 **Today's Detective** 프로젝트의 API 명세서입니다.
 프론트엔드(Next.js)에서 사용하는 **Client API**와 백엔드(FastAPI)에서 제공하는 **Server API**로 구성됩니다.
 

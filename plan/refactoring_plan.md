@@ -1,5 +1,11 @@
 # 리팩토링 계획서: 오늘의 탐정 (Project Refactoring Plan) [완료]
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> 초기 리팩터링 메모.
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 ## 1. 목표 (Objective)
 현재 단일 파일(`page.tsx`, 약 700라인)에 집중된 게임 로직, UI, 상태 관리를 모듈화하여 유지보수성, 가독성, 확장성을 개선합니다.
 

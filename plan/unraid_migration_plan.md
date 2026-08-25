@@ -919,20 +919,44 @@ Exception: parameter `response` must be an instance of starlette.responses.Respo
 | `chat` 성공 경로 | **200** (§5-C 수정 후) |
 | 브라우저 배선 | 비밀 커맨드 → 모달 → 토큰 저장 → 관리자 API 200 / 토큰 없으면 401 |
 
-### Phase 6 — AWS 정리 및 문서 갱신
+### Phase 6 — AWS 정리 및 문서 갱신 (레포 작업 완료 / AWS 콘솔 작업 대기)
 
-- [ ] 6.1 신규 스택 정상 동작 확인 (§5 체크리스트 완주)
-- [ ] 6.2 Lambda `todays-detective-api` + API Gateway 삭제
-- [ ] 6.3 S3 버킷 `todays-detective` 삭제
-- [ ] 6.4 MongoDB Atlas 클러스터 삭제
-- [ ] 6.5 IAM 사용자 `todays-detective-uploader` + Access Key 삭제
-- [ ] 6.6 Vercel 프로젝트 정리 (또는 배포 중단)
-- [ ] 6.7 `lambda/` 디렉터리 제거 (git 이력에 남으므로 복구 가능)
-- [ ] 6.8 **`CLAUDE.md` 전면 갱신** — 현재도 이미 삭제된 FastAPI/Docker 구조를 설명하고 있어 낡았다. 이번엔 두 번 낡지 않게 한 번에 정리 (Commands, Architecture, Environment Variables, Data Model 전 섹션)
-- [ ] 6.9 `plan/aws_migration_plan.md`, `plan/backend_integration_plan.md`에 "과거 이력" 표기 (현행 아님)
-- [ ] 6.10 `README.md` — create-next-app 기본 템플릿 그대로다. compose 기동 방법으로 교체
+- [x] 6.1 신규 스택 정상 동작 확인 (§5 체크리스트 완주)
+- [ ] 6.2 Lambda `todays-detective-api` + API Gateway 삭제  ← **콘솔 작업 필요 (§6-A)**
+- [ ] 6.3 S3 버킷 `todays-detective` 삭제  ← **콘솔 작업 필요 (§6-A)**
+- [ ] 6.4 MongoDB Atlas 클러스터 삭제  ← **콘솔 작업 필요 (§6-A)**
+- [ ] 6.5 IAM 사용자 `todays-detective-uploader` + Access Key 삭제  ← **콘솔 작업 필요 (§6-A)**
+- [ ] 6.6 Vercel 프로젝트 정리 (또는 배포 중단)  ← **콘솔 작업 필요 (§6-A)**
+- [x] 6.7 `lambda/` 디렉터리 제거 (git 이력에 남으므로 복구 가능)
+- [x] 6.8 **`CLAUDE.md` 전면 갱신** — 현재도 이미 삭제된 FastAPI/Docker 구조를 설명하고 있어 낡았다. 이번엔 두 번 낡지 않게 한 번에 정리 (Commands, Architecture, Environment Variables, Data Model 전 섹션)
+- [x] 6.9 `plan/aws_migration_plan.md`, `plan/backend_integration_plan.md`에 "과거 이력" 표기 (현행 아님)
+- [x] 6.10 `README.md` — create-next-app 기본 템플릿 그대로다. compose 기동 방법으로 교체
 
 ---
+
+#### §6-A. Phase 6 결과
+
+**레포 작업 완료**
+
+| 항목 | 내용 |
+|---|---|
+| 6.1 동작 확인 | 컨테이너 4개 healthy, 공개 엔드포인트 5개 200, 시나리오 4건·피드백 1건, 백업 2개 |
+| 6.7 `lambda/` 제거 | git 이력에 남아 복구 가능. `.gitignore`·`.dockerignore`의 Lambda 항목도 정리 |
+| 6.8 `CLAUDE.md` 전면 갱신 | 삭제된 `backend/`·Docker 설명을 현재 구조로 교체. **"손대기 전에 알아야 할 것" 5개** 추가 (스포일러 정화, 평가 파싱, 예산, case_data 스키마, 3단 타임아웃) |
+| 6.9 과거 문서 표기 | 계획 문서 8건 상단에 "과거 이력 — 현행 아님" 배너 |
+| 6.10 `README.md` | create-next-app 기본 템플릿 → 실제 프로젝트 설명 |
+
+`server/app/*` 주석의 `lambda/handler.py에서 이식했다` 출처 표기는 그대로 뒀다 —
+이식된 로직을 원문과 대조할 수 있게 CLAUDE.md에 git 복구 명령을 적어뒀다.
+
+**로컬 `.env`(레포 루트)는 지우지 않았다.** 죽은 AWS·구 Gemini 키 외에 이 프로젝트와 무관한
+`GITHUB_MCP_PAT`가 들어 있어 삭제 판단은 사용자에게 맡긴다. `NEXT_PUBLIC_API_URL`은 더 이상
+쓰이지 않으므로 로컬 개발에 필요한 값은 `API_INTERNAL_URL` 하나뿐이다.
+
+**AWS·Vercel 콘솔 작업은 남아 있다 (6.2~6.6).** §0-A에서 확인한 대로 로컬 AWS 자격증명이
+무효라 CLI로 처리할 수 없다. 삭제는 되돌릴 수 없으므로 신규 스택을 며칠 운영해본 뒤
+진행하는 것을 권한다. 그때까지 롤백 경로(Vercel의 `NEXT_PUBLIC_API_URL`을 API Gateway로 되돌리기)가
+살아 있다.
 
 ## 5. 환경변수 매트릭스
 

@@ -1,5 +1,11 @@
 # 🎨 프로젝트: 용의자 초상화 생성 및 표시 시스템 구현 계획 (Revised)
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> Imagen 기반 초상화 생성 계획이다. 현재는 Gemini 이미지 모델(`generateContent` + `imageConfig`)을 쓴다 — 계획 문서 §0-F 참조.
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 ## 1. 개요 (Overview)
 '오늘의 탐정' 게임의 몰입도를 높이기 위해, 사건 생성 시 **Google Imagen 4 Fast (imagen-4.0-fast-generate-001)** 모델을 활용하여 용의자 3명의 초상화를 생성합니다. "한국 만화(웹툰) 스타일"의 흑백 일러스트로 생성된 이미지는 게임 내에서 256px 크기로 표시되며, 사건 데이터와 함께 서버에 저장됩니다. 기존 데이터와의 호환성을 위해 이미지가 없는 경우 기본 아이콘을 사용합니다.
 

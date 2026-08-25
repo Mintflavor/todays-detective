@@ -1,5 +1,11 @@
 # Python 백엔드 → AWS Lambda 네이티브 마이그레이션 플랜
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> AWS 이전 작업 로그.
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 ## Context
 
 현재 FastAPI 백엔드(포트 8001)는 Docker 또는 로컬 uvicorn으로 상시 실행해야 한다.

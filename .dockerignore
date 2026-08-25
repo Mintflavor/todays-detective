@@ -10,7 +10,6 @@ Dockerfile
 # 컨테이너에 들어갈 이유가 없는 것들
 infra/
 server/
-lambda/
 plan/
 .agent/
 .claude/

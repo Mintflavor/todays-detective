@@ -1,5 +1,11 @@
 # 백엔드 통합 및 시나리오 저장 시스템 구축 계획 [완료]
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> FastAPI + Docker MongoDB를 처음 도입할 때의 계획이다. 이후 AWS Lambda로 갔다가 다시 FastAPI 컨테이너로 돌아왔다. **현재 구조가 아니다.**
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 ## 1. 목표
 **Python (FastAPI)**와 **MongoDB**를 사용하여 게임 시나리오의 영구 저장소를 구축합니다. 모든 백엔드 서비스(API 서버, DB)는 **Docker Container** 환경에서 실행됩니다. 이를 통해 플레이어는 생성된 추리 시나리오를 저장하고, 나중에 '사건 기록실' 컨셉의 UI를 통해 다시 불러와 플레이할 수 있습니다.
 
