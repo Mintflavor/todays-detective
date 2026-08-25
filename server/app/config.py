@@ -54,6 +54,24 @@ class Settings(BaseSettings):
     api_key_admin: str = ""
     admin_password: str = ""
 
+    # ── 레이트 리밋 (예산 보호) ───────────────────────────────
+    # 실측: 새 사건 생성 159원(초상화 3장이 93%), 심문 0.68원, 평가 4.91원.
+    # 신규 한 판 약 171원 → 월 5,000원 한도로 약 29판.
+    rate_limit_enabled: bool = True
+    # ⚠️ 아래 제한은 모두 **전역**이다. Next rewrite 프록시가 X-Forwarded-For를 전달하지 않아
+    #    per-IP 구분이 불가능하다 (실측 확인). 상세는 app/ratelimit.py 참조.
+    #
+    # 예산 상한의 본체:
+    #   25/month x 171원 = 약 4,275원 (월 5,000원의 85%). 나머지는 기록 재생용으로 남긴다.
+    #   3/day  = 하루 최대 약 477원. 하루에 한 달치를 태우는 것을 막는다.
+    #   2/hour = 순간 폭주 차단.
+    rate_limit_start_global: str = "2/hour;3/day;25/month"
+    # 아래 둘은 비용이 미미하므로 남용 방어 수준. 한 판 최대 20 AP = 심문 20회.
+    rate_limit_chat: str = "60/hour"
+    rate_limit_evaluate: str = "15/hour"
+    # 비우면 메모리 저장소를 쓴다 — 재시작 시 카운터가 초기화되어 월 상한이 무의미해진다.
+    rate_limit_storage_uri: str = ""
+
     # ── 동작 ─────────────────────────────────────────────────
     log_level: str = Field(default="INFO")
 

@@ -6,9 +6,10 @@
 #
 # 공통 픅스처.
 #
-# 원칙 두 가지:
+# 원칙 세 가지:
 #   1. **테스트가 Gemini를 호출하지 않는다.** 호출 시 즉시 실패한다 (비용 발생 방지).
 #   2. **운영 데이터를 건드리지 않는다.** 전용 *_pytest 컬렉션을 쓰고 매 테스트마다 비운다.
+#   3. **레이트 리밋 카운터를 소진하지 않는다.** 카운터는 운영 Mongo에 있으므로 끈다.
 
 import io
 from typing import Any
@@ -22,6 +23,19 @@ from PIL import Image
 # 운영 컬렉션(scenarios, feedbacks)은 건드리지 않는다.
 TEST_SCENARIOS = "scenarios_pytest"
 TEST_FEEDBACKS = "feedbacks_pytest"
+
+
+# ─────────────────── 레이트 리밋 차단 (autouse) ───────────────────
+@pytest.fixture(autouse=True)
+def disable_rate_limit(monkeypatch):
+    """테스트가 실제 레이트 리밋 카운터를 소진하지 못하게 한다.
+
+    카운터는 운영 Mongo에 저장된다(월 상한이 재시작으로 리셋되지 않게 하려고).
+    끄지 않으면 pytest 한 번 돌릴 때마다 실제 예산 카운터가 깎여 정상 플레이가 막힌다.
+    """
+    from app.ratelimit import limiter
+
+    monkeypatch.setattr(limiter, "enabled", False)
 
 
 # ─────────────────────── Gemini 차단 (autouse) ───────────────────────

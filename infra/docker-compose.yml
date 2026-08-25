@@ -112,6 +112,12 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       API_KEY_ADMIN: ${API_KEY_ADMIN}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # 레이트 리밋 (예산 보호). 상세 근거는 app/ratelimit.py 주석 참조.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED}
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI}
+      RATE_LIMIT_START_GLOBAL: ${RATE_LIMIT_START_GLOBAL}
+      RATE_LIMIT_CHAT: ${RATE_LIMIT_CHAT}
+      RATE_LIMIT_EVALUATE: ${RATE_LIMIT_EVALUATE}
       LOG_LEVEL: INFO
     depends_on:
       todays-detective-mongo:

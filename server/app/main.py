@@ -10,10 +10,14 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from . import db, storage
+from .ratelimit import limiter, log_config as log_ratelimit_config
 from .routers import feedbacks, game, scenarios
 from .config import get_settings
 
@@ -33,6 +37,7 @@ async def lifespan(_: FastAPI):
         logger.info("MongoDB 연결 확인")
     else:
         logger.error("MongoDB 연결 실패 — /healthz가 degraded를 반환한다")
+    log_ratelimit_config()
     yield
     db.close()
     logger.info("종료 완료")
@@ -44,6 +49,31 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
+
+
+@app.exception_handler(RateLimitExceeded)
+def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """429 응답. 프론트는 detail을 읽어 그대로 보여준다 (app/lib/http.ts).
+
+    무료 경로("지난 사건 기록")로 안내하는 문구를 쓴다 — 막기만 하면 사용자는
+    무엇을 해야 할지 모른다.
+    """
+    is_start = request.url.path.rstrip("/").endswith("/api/game/start")
+    if is_start:
+        detail = (
+            "새 사건 생성 한도에 도달했습니다. "
+            "'지난 사건 기록'에서 이전 사건을 플레이할 수 있습니다."
+        )
+    else:
+        detail = "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+    logger.warning(
+        "레이트 리밋 초과: %s %s (limit=%s)", request.method, request.url.path, exc.detail
+    )
+    return JSONResponse(status_code=429, content={"detail": detail})
+
 
 # Lambda의 Access-Control-Allow-Origin: * 를 화이트리스트로 대체한다.
 # api를 외부에 노출하지 않으므로 보통 자기 도메인 하나로 충분하다. (계획 §3-3)

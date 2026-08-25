@@ -772,12 +772,74 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 - [ ] 5.2 `X-API-Key` 의존성 적용: `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`, `POST /scenarios`
 - [ ] 5.3 `GET /scenarios/{id}`(**스포일러 원본**)를 관리자 인증 뒤로 이동. 관리자 화면만 이 경로를 쓰고, 플레이어는 정화본 `/api/game/scenario/{id}`만 사용
 - [ ] 5.4 관리자 인증을 FastAPI로 이동 — `POST /admin/login`(비밀번호) → 단기 토큰 발급. 현재는 Next.js가 비밀번호만 확인하고 삭제는 브라우저→API 직접 호출이라 우회된다
-- [ ] 5.5 **`POST /api/game/start` 레이트 리밋 필수** (`slowapi` 또는 NPM 레벨). 이제 모든 시작 요청이 실제 생성이므로 **요청 1건 = Gemini 텍스트 1회 + Imagen 3장의 실비**다. IP당 시간 제한을 반드시 건다
-- [ ] 5.6 `/api/game/{chat,evaluate}`도 완만한 레이트 리밋 (토큰 비용 방어)
+- [x] 5.5 **`POST /api/game/start` 레이트 리밋** — Phase 5 나머지보다 먼저 적용 완료 (§5-A)
+- [x] 5.6 `/api/game/{chat,evaluate}` 레이트 리밋 (§5-A)
 - [ ] 5.7 **모든 외부 키 로테이션**
   - `.env`에 장기간 평문으로 있던 `GEMINI_API_KEY`, `GITHUB_MCP_PAT` 교체
   - `ADMIN_PASSWORD` 신규 난수로 교체 (Phase 0.5에서 생성)
   - AWS 키는 Phase 6에서 자원과 함께 폐기
+
+#### §5-A. 레이트 리밋 (선행 적용, 2026-08-25)
+
+Phase 5 전체를 미루더라도 예산 소진 위험은 즉시 막아야 해서 5.5/5.6만 먼저 넣었다.
+
+**실측 단가** (`countTokens` 기반, 무료 측정)
+
+| 액션 | 토큰 | 비용 |
+|---|---|---|
+| 새 사건 생성 | in 1,327 / out 1,743 + 이미지 3장 | **159원** ← 이 중 **93%가 초상화** |
+| 심문 1회 | in 873 / out ~80 | 0.68원 |
+| 평가 1회 | in 951 / out ~700 | 4.91원 |
+| **신규 한 판** (심문 10회) | | **171원** → 월 5,000원으로 **29판** |
+| **기록 재생 한 판** | | **11.7원** → **427판** (15배 저렴) |
+
+조일 대상은 `POST /api/game/start` 하나다. 나머지는 남용 방어 수준으로 둔다.
+
+**설정** (전부 전역)
+
+```
+RATE_LIMIT_START_GLOBAL=2/hour;3/day;25/month
+RATE_LIMIT_CHAT=60/hour
+RATE_LIMIT_EVALUATE=15/hour
+RATE_LIMIT_STORAGE_URI=<Mongo>       # 메모리면 재시작 시 월 상한이 리셋된다
+```
+
+- `25/month` × 171원 ≈ **4,275원** (한도의 85%). 나머지는 기록 재생용
+- `3/day` = 하루 최대 약 477원. 하루에 한 달치를 태우는 것을 막는다
+- `2/hour` = 순간 폭주 차단
+
+**⚠️ per-IP 제한은 불가능하다 (실측 확인).** Next의 rewrite 프록시가 `X-Forwarded-For`를
+전달하지 않아 리밋 키가 클라이언트 IP가 아니라 **web 컨테이너 주소(172.21.0.5)**로 잡혔다.
+모든 사용자가 한 키를 공유한다. per-IP인 척하는 설정은 실제 동작을 오해하게 만들므로
+제거하고 **전역 제한 하나**로 정리했다. (XFF가 전달되더라도 NPM이
+`$proxy_add_x_forwarded_for`로 덧붙이는 방식이라 맨 앞 값은 위조 가능하다 —
+결국 예산 보호는 전역 제한이 담당해야 한다.)
+
+**429 응답은 무료 경로로 안내한다** — 막기만 하면 사용자는 무엇을 해야 할지 모른다.
+```
+새 사건 생성 한도에 도달했습니다. '지난 사건 기록'에서 이전 사건을 플레이할 수 있습니다.
+```
+
+**배포 중 터진 버그 2건**
+
+| 증상 | 원인 | 해결 |
+|---|---|---|
+| 모든 요청 500 | `limits`가 URI의 DB가 아니라 기본값 `limits` DB를 쓴다. 앱 계정은 `todays_detective`에만 권한이 있어 `not authorized on limits` | `storage_options={"database_name": ...}`로 같은 DB 지정 |
+| 모든 요청 500 | slowapi는 `@limiter.limit(..., key_func=f)`로 넘긴 함수를 **인자 없이** 호출한다 (`lim.key_func()`) | `global_key(*_)` 가변 인자로 변경 |
+
+**검증**
+
+- `evaluate` 15회까지 404 → **16회차부터 429** (Gemini 호출 없는 경로로 무료 검증)
+- 429 본문이 `detail`로 오고 프론트의 `errorMessage` 헬퍼가 그대로 표시
+- 카운터가 `todays_detective.rate_limit_counters`에 저장됨
+- **컨테이너 재시작 후에도 429 유지** — 월 상한이 리셋되지 않는다
+- `start`의 429 메시지가 기록실로 안내함을 확인
+- 기록 재생(`GET /api/game/scenario/{id}`)은 제한 없이 열려 있음
+- pytest **174건 통과**. `conftest`에 autouse 픅스처를 넣어 **테스트가 실제 예산 카운터를
+  소진하지 못하게** 막았다 (카운터가 운영 Mongo에 있으므로 필수)
+
+**남은 Phase 5 항목**: 5.1(CORS 정리), 5.2(X-API-Key), 5.3(스포일러 원본 인증),
+5.4(관리자 인증 api 이동), 5.7(키 로테이션)
 
 ### Phase 6 — AWS 정리 및 문서 갱신
 

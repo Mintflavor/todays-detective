@@ -22,10 +22,11 @@ from typing import Any
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from .. import db, gemini, storage
 from ..config import get_settings
+from ..ratelimit import global_key, limiter
 from ..models import (
     ChatRequest,
     ChatResponse,
@@ -46,6 +47,8 @@ from ..sanitize import find_culprit, sanitize_case_data
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/game", tags=["game"])
+
+_settings = get_settings()
 
 # ── Lambda 원문과 글자 단위로 동일한 정규식 ─────────────────────────
 _GRADE_RE = re.compile(r"\[GRADE[^\]]*\]\s*(.*)")
@@ -108,12 +111,14 @@ def _attach_portrait(suspect: dict[str, Any]) -> None:
 
 
 @router.post("/start", response_model=GameStartResponse)
-def start_case() -> GameStartResponse:
+# 전역 제한. per-IP는 XFF가 전달되지 않아 불가능하다. 근거는 app/ratelimit.py 참조.
+@limiter.limit(_settings.rate_limit_start_global, key_func=global_key)
+def start_case(request: Request) -> GameStartResponse:
     """새 사건을 생성해 저장하고 정화본을 반환한다.
 
+    ⚠️ 이 엔드포인트 1회 = 약 159원 (초상화 3장이 93%). 가장 비싼 경로다.
     수십 초가 걸린다 (텍스트 1회 + 이미지 3장). 프록시 타임아웃을 넉넉히 둘 것.
     """
-    # TODO(Phase 5.5): 레이트 리밋. 이 엔드포인트 1회 = Gemini 텍스트 1회 + 이미지 3장의 실비.
     settings = get_settings()
 
     raw = gemini.call_gemini(CASE_GENERATION_PROMPT, settings.gemini_model)
@@ -155,7 +160,8 @@ def start_case() -> GameStartResponse:
 
 # ─────────────────────────── 용의자 심문 ───────────────────────────
 @router.post("/chat", response_model=ChatResponse)
-def chat(req: ChatRequest) -> ChatResponse:
+@limiter.limit(_settings.rate_limit_chat, key_func=global_key)
+def chat(request: Request, req: ChatRequest) -> ChatResponse:
     doc = _load_scenario(req.scenarioId)
     case_data = doc.get("case_data") or {}
 
@@ -189,7 +195,8 @@ def chat(req: ChatRequest) -> ChatResponse:
 
 # ─────────────────────────── 추리 평가 ───────────────────────────
 @router.post("/evaluate", response_model=EvaluateResponse)
-def evaluate(req: EvaluateRequest) -> EvaluateResponse:
+@limiter.limit(_settings.rate_limit_evaluate, key_func=global_key)
+def evaluate(request: Request, req: EvaluateRequest) -> EvaluateResponse:
     doc = _load_scenario(req.scenarioId)
     case_data = doc.get("case_data") or {}
 
