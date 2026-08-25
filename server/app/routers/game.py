@@ -37,7 +37,7 @@ from ..models import (
     game_result_to_db,
 )
 from ..prompts import (
-    CASE_GENERATION_PROMPT,
+    build_case_spec,
     generate_evaluation_prompt,
     generate_portrait_prompt,
     generate_suspect_prompt,
@@ -110,6 +110,50 @@ def _attach_portrait(suspect: dict[str, Any]) -> None:
         )
 
 
+def _coerce_bool(value: object) -> bool:
+    """LLM이 isCulprit을 문자열로 줄 수 있다.
+
+    파이썬 truthiness에 그냥 맡기면 `"false"`가 True가 되어 **엉뚱한 인물이
+    범인이 된다.** find_culprit()은 truthiness를 쓰므로 여기서 걸러야 한다.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
+def _normalize_culprit(case_data: dict[str, Any], expected_id: int) -> None:
+    """isCulprit을 boolean으로 정규화하고 정확히 1명만 남긴다. 제자리 수정.
+
+    범인이 0명이면 find_culprit()이 None을 반환하고, 평가 프롬프트의 정답이
+    "Unknown"이 되어 **모든 추리가 조용히 틀리게 채점된다.** 예외가 나지 않으므로
+    반드시 여기서 막는다.
+    """
+    suspects = [s for s in case_data.get("suspects") or [] if isinstance(s, dict)]
+    if not suspects:
+        return
+
+    for s in suspects:
+        s["isCulprit"] = _coerce_bool(s.get("isCulprit"))
+
+    culprits = [s for s in suspects if s["isCulprit"]]
+    if len(culprits) == 1:
+        return
+
+    # 지정한 id를 우선 쓰고, 없으면 첫 번째 인물로 떨어뜨린다.
+    target = next((s for s in suspects if s.get("id") == expected_id), suspects[0])
+    logger.warning(
+        "생성 결과의 범인이 %d명이다 (지정 id=%s). '%s'(id=%s)로 교정한다.",
+        len(culprits),
+        expected_id,
+        target.get("name", "?"),
+        target.get("id"),
+    )
+    for s in suspects:
+        s["isCulprit"] = s is target
+
+
 @router.post("/start", response_model=GameStartResponse)
 # 전역 제한. per-IP는 XFF가 전달되지 않아 불가능하다. 근거는 app/ratelimit.py 참조.
 @limiter.limit(_settings.rate_limit_start_global, key_func=global_key)
@@ -121,13 +165,29 @@ def start_case(request: Request) -> GameStartResponse:
     """
     settings = get_settings()
 
-    raw = gemini.call_gemini(CASE_GENERATION_PROMPT, settings.gemini_model)
+    # 다양성 축(무대·조건·범죄 유형·범인 위치·증거 개수)을 서버에서 뽑아 주입한다.
+    # LLM에게 무작위 선택을 맡기면 고르지 않는다 — prompts.py 주석 참조.
+    spec = build_case_spec()
+    raw = gemini.call_gemini(spec.prompt, settings.gemini_model)
     case_data = _parse_case_json(raw)
 
     suspects = case_data.get("suspects") or []
     if not suspects:
         logger.error("생성된 사건에 suspects가 없습니다: keys=%s", list(case_data.keys()))
         raise HTTPException(status_code=500, detail="Invalid generated case data")
+
+    # 지정 조건을 지켰는지 확인한다. isCulprit은 교정하고, 나머지는 경고만 남긴다
+    # (서사와 어긋나게 값을 덮어쓰면 사건이 앞뒤가 안 맞는다).
+    _normalize_culprit(case_data, spec.culprit_id)
+    if case_data.get("crime_type") != spec.crime_type:
+        logger.warning(
+            "crime_type 불일치: 지정=%s 결과=%s", spec.crime_type, case_data.get("crime_type")
+        )
+    actual_evidence = len(case_data.get("evidence_list") or [])
+    if actual_evidence != spec.evidence_count:
+        logger.warning(
+            "evidence_list 개수 불일치: 지정=%d 결과=%d", spec.evidence_count, actual_evidence
+        )
 
     # 초상화 3장 병렬 생성. 순차로는 대기시간이 3배가 된다.
     with ThreadPoolExecutor(max_workers=len(suspects)) as pool:
