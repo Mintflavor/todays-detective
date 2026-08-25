@@ -178,7 +178,31 @@ def start_case(request: Request) -> GameStartResponse:
 
     # 지정 조건을 지켰는지 확인한다. isCulprit은 교정하고, 나머지는 경고만 남긴다
     # (서사와 어긋나게 값을 덮어쓰면 사건이 앞뒤가 안 맞는다).
+    #
+    # 매 생성의 지정값을 남긴다. 이게 없으면 "LLM이 지정을 따랐는지"를
+    # 사후에 판정할 수 없다 — 결과만 봐서는 우연히 맞은 것과 구별되지 않는다.
+    logger.info(
+        "지정 조건: crime_type=%s culprit_id=%d evidence=%d stage=%.30s",
+        spec.crime_type,
+        spec.culprit_id,
+        spec.evidence_count,
+        spec.stage,
+    )
     _normalize_culprit(case_data, spec.culprit_id)
+
+    actual_culprit = next(
+        (s for s in suspects if isinstance(s, dict) and s.get("isCulprit")), None
+    )
+    actual_culprit_id = (actual_culprit or {}).get("id")
+    if actual_culprit_id != spec.culprit_id:
+        # 교정 대상이 아니다 (범인은 정확히 1명이다). LLM이 다른 인물을 골랐을 뿐이며
+        # 서사는 그 인물 기준으로 일관되므로 덮어쓰지 않는다. 다만 빈도는 봐야 한다.
+        logger.warning(
+            "범인 위치 불일치: 지정 id=%d 결과 id=%s (%s)",
+            spec.culprit_id,
+            actual_culprit_id,
+            (actual_culprit or {}).get("name", "?"),
+        )
     if case_data.get("crime_type") != spec.crime_type:
         logger.warning(
             "crime_type 불일치: 지정=%s 결과=%s", spec.crime_type, case_data.get("crime_type")
