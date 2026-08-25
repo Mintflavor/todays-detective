@@ -160,7 +160,7 @@
 - [x] 0.3 `appdata` 경로 생성 — `/mnt/user/appdata/todays-detective/` 하위 5개 디렉터리 (물리 위치 `disk3`). §0-C 참조
 - [x] 0.4 ~~(선택) Atlas 스냅샷 + `aws s3 sync`로 폐기 전 사본~~ — **불가 확인**. §0-A 참조
 - [x] 0.5 신규 시크릿 생성 — `.env.unraid` 생성 (gitignore 대상). Mongo root/app 비밀번호, MinIO 루트 자격증명, `API_KEY_ADMIN`, 신규 `ADMIN_PASSWORD`
-- [ ] 0.6 **유효한 `GEMINI_API_KEY` 확보** — Phase 2 검증의 하드 블로커 (§0-A)
+- [x] 0.6 유효한 `GEMINI_API_KEY` 확보 + 모델 3종 교체 — 검증 완료. §0-E
 
 #### §0-A. 로컬 `.env` 자격증명 전량 만료 (2026-08-25 확인)
 
@@ -243,6 +243,66 @@ cache pool   : sdc1 단일 ZFS, 444G 중 443G 여유 (거의 미사용)
 | docker0 | 172.17.0.1 |
 | SSH | `ssh unraid` (키 인증, `~/.ssh/unraid_todays_detective`) |
 
+#### §0-E. Gemini 키·모델 갱신 결과 (2026-08-25)
+
+키가 새로 발급되어 유효하고, 모델 3종이 모두 교체됐다. 셋 다 접근 가능함을 확인했다.
+
+| 용도 | 모델 | 지원 메서드 | 토큰 한도 |
+|---|---|---|---|
+| 사건 생성 | `gemini-3.6-flash` | `generateContent` 등 | in 1,048,576 / out 65,536 |
+| 용의자 심문 | `gemini-3.5-flash-lite` | `generateContent` 등 | in 1,048,576 / out 65,536 |
+| 초상화 | `gemini-3.1-flash-lite-image` | `generateContent` **만** | in 65,536 / out 65,536 |
+
+**⚠️ 비용 한도: 개발용 키, 월 5,000원.** 이것이 두 가지를 강제한다.
+
+1. **Phase 5.5 레이트 리밋은 선택이 아니다.** `POST /api/game/start` 1건 = 텍스트 1회 + 이미지 3장. 공개 도메인에 무제한으로 열어두면 봇 한 대가 월 한도를 순식간에 소진한다. **배포와 동시에** 적용한다
+2. **Phase 2 테스트도 절약한다.** 키 유효성·모델 존재 확인은 무료(메타데이터 조회)로 처리하고, 실제 생성 호출은 필요한 최소 횟수만 수행한다
+
+#### §0-F. ⚠️ 초상화 생성 코드가 그대로는 동작하지 않는다 (Phase 2 필수 변경)
+
+`IMAGEN_MODEL`이 Imagen이 아니라 **Gemini 이미지 모델**로 바뀌었다. `gemini-3.1-flash-lite-image`는
+`generateContent`만 지원하고 **`predict`를 지원하지 않는다.** 그런데 현재 코드는 Imagen의 `predict`
+엔드포인트를 쓴다:
+
+- [lambda/gemini_client.py](../lambda/gemini_client.py) `generate_image()` — `client.models.generate_images()` + `types.GenerateImagesConfig`
+- [app/api/game/lib/gemini.ts](../app/api/game/lib/gemini.ts) `generateImage()` — `genAI.models.generateImages()`
+
+**둘 다 실패한다.** Phase 2에서 `generateContent` 방식으로 재작성해야 한다.
+
+실제 호출로 확인한 동작 형태 (1회 프로브):
+
+```python
+resp = client.models.generate_content(
+    model=settings.image_model,
+    contents=prompt,
+    config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+)
+for part in resp.candidates[0].content.parts:
+    if part.inline_data:                      # REST에서는 inlineData
+        image_bytes = part.inline_data.data   # base64 디코드된 bytes
+        # mime_type = "image/jpeg"
+```
+
+확인된 응답 특성:
+
+| 항목 | 값 |
+|---|---|
+| `finishReason` | `STOP` |
+| part 구성 | `inlineData` + `thoughtSignature` (텍스트 part 없음) |
+| mimeType | `image/jpeg` |
+| 원본 크기 | **768 × 1344 (세로 9:16)** — 1:1이 아니다 |
+| 용량 | 약 866 KB |
+| 토큰 사용 | prompt 11 + image out 1,120 = 1,516 |
+
+**추가 문제: 반환 이미지가 정사각형이 아니다.** 기존 리사이즈 코드는
+[lambda/s3_upload.py](../lambda/s3_upload.py)의 `img.resize((size, size))`로 **크롭 없이 강제 축소**한다 →
+768×1344를 512×512로 만들면 인물이 가로로 찌그러진다.
+
+Phase 2 대응:
+1. `imageConfig.aspectRatio: "1:1"` 지원 여부를 **1회만** 확인한다 (비용 절약)
+2. 지원하든 안 하든 **center-crop 후 resize**로 바꾼다 — 어떤 종횡비가 와도 안전한 유일한 방법이다
+3. 환경변수명 `IMAGEN_MODEL` → `IMAGE_MODEL`로 정리 (더 이상 Imagen이 아니다)
+
 ### Phase 1 — 데이터 계층 부팅 ✅ 완료 (2026-08-25)
 
 unraid에 직접 배포하여 검증했다. 산출물은 [`infra/`](../infra/), 배포 절차는 [infra/README.md](../infra/README.md).
@@ -320,7 +380,7 @@ server/
   _SPOILER_SUSPECT_FIELDS = ("isCulprit", "secret", "real_action", "motive", "trick")
   ```
 - [ ] 2.4 `routers/game.py` — **재작성이 아니라 이식**해야 할 부분:
-  - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성 → Pillow 512px JPEG q80 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
+  - **`start` (신규 생성, §3-1)**: `CASE_GENERATION_PROMPT` → JSON 파싱(` ```json ` 펜스 제거) → 초상화 3장 병렬 생성(**§0-F — 코드 재작성 필요**) → Pillow center-crop 후 512px JPEG q80 → MinIO 업로드 → DB 저장 → **정화본** 반환. 초상화 실패는 개별 흡수(아이콘 폴백). `$sample`/`excludeIds` 코드는 이식하지 않는다
   - `chat`: `generate_suspect_prompt(suspect, world_setting, timeline_truth, evidence_list)` → `f"{system}\n\n[이전 대화]\n{history}\n\n탐정: {message}\n용의자:"`, 모델은 `GEMINI_CHAT_MODEL or GEMINI_MODEL`
   - `evaluate`: 정규식 3개와 폴백 문구를 **원문 유지**
     ```python
