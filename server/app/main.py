@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
+from . import db, storage
 from .config import get_settings
 
 settings = get_settings()
@@ -61,11 +61,14 @@ else:
 
 @app.get("/healthz", tags=["ops"])
 def healthz():
-    """컨테이너 헬스체크용. DB가 죽어도 200을 주되 status로 구분한다."""
+    """컨테이너 헬스체크용. 의존성이 죽어도 200을 주되 status로 구분한다."""
     mongo_ok = db.ping()
+    s3_err = storage.health()
     return {
-        "status": "ok" if mongo_ok else "degraded",
+        "status": "ok" if (mongo_ok and s3_err is None) else "degraded",
         "mongo": mongo_ok,
+        "storage": s3_err is None,
+        **({"storage_error": s3_err} if s3_err else {}),
     }
 
 
