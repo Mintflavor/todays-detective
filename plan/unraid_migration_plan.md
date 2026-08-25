@@ -32,10 +32,10 @@
                           ▼
         ┌─────────────────────────────────────────────┐
         │  NPM (기존 운영 중 — 이 스택 외부)            │
-        │   detective.example.com     → web:3000       │
-        │   cdn.detective.example.com → minio:9000     │
+        │   detective.example.com     → 172.17.0.1:3100 │
+        │   cdn.detective.example.com → 172.17.0.1:9100 │
         └───┬─────────────────────────────┬───────────┘
-            │   network: npm-proxy (external)
+            │   docker0 바인드 (LAN 미노출, §0-B)
             │                             │
   ┌─────────▼──────────────┐   ┌──────────▼───────────┐
   │ todays-detective-web   │   │ todays-detective-    │
@@ -69,17 +69,19 @@
 
 | 컨테이너 | 이미지 | 포트 | 볼륨 | 네트워크 |
 |---|---|---|---|---|
-| `todays-detective-web` | 자체 빌드 (node:22-alpine) | 3000 (미공개) | — | `npm-proxy` + 내부 |
-| `todays-detective-api` | 자체 빌드 (python:3.12-slim) | 8000 (미공개) | — | 내부만 |
-| `todays-detective-mongo` | `mongo:8` | 27017 (미공개) | `appdata/mongo/{data,config}` | 내부만 |
-| `todays-detective-minio` | `minio/minio:<고정태그>` | 9000 (미공개) | `appdata/minio/data` | `npm-proxy` + 내부 |
-| `todays-detective-minio-init` | `minio/mc:<고정태그>` | — | — | 내부만 |
+| `todays-detective-web` | 자체 빌드 (node:22-alpine) | `172.17.0.1:3100`→3000 | — | `todays-detective-net` |
+| `todays-detective-api` | 자체 빌드 (python:3.12-slim) | 미공개 | — | `todays-detective-net` |
+| `todays-detective-mongo` | `mongo:8` | 미공개 | `appdata/mongo/{data,config,init}` | `todays-detective-net` |
+| `todays-detective-minio` | `minio/minio:<고정태그>` | `172.17.0.1:9100`→9000 | `appdata/minio/data` | `todays-detective-net` |
+| `todays-detective-minio-init` | `minio/mc:<고정태그>` | — | — | `todays-detective-net` |
 
 > **compose 서비스명 = 컨테이너명**으로 통일한다(`container_name`과 서비스 키를 동일하게). Docker DNS가 이 이름으로 해석되므로 NPM의 Forward Hostname과 `next.config.ts` rewrite 주소가 컨테이너명과 정확히 일치한다.
 
 > `todays-detective-minio-init`은 부팅 시 1회 실행 후 종료되는 컨테이너다 (`restart: "no"`).
 
 > **기존 데이터를 폐기하므로 Mongo 버전 호환 제약이 없다.** `mongo:8` 최신 안정 메이저로 시작하고 태그를 고정한다.
+
+> 볼륨 실경로는 `/mnt/user/appdata/todays-detective/` (물리적으로 `disk3`, array). §0-C
 
 ---
 
@@ -154,16 +156,8 @@
 ### Phase 0 — 준비
 
 - [ ] 0.1 도메인 2개 확보: `detective.example.com`(웹), `cdn.detective.example.com`(이미지)
-- [ ] 0.2 NPM이 붙어 있는 docker 네트워크 이름 확인
-  ```bash
-  docker inspect <npm-container> --format '{{json .NetworkSettings.Networks}}'
-  ```
-  → 이 이름을 compose의 `external` 네트워크로 쓴다 (Phase 4.2)
-- [ ] 0.3 `appdata` 경로 생성
-  ```
-  /mnt/user/appdata/todays-detective/{mongo/data,mongo/config,minio/data}
-  ```
-  **cache 풀(SSD)에 위치**시킬 것. array(HDD)에 두면 Mongo 성능이 크게 떨어진다
+- [x] 0.2 NPM 네트워크 확인 — **기본 `bridge`에 있음 → 컨테이너명 DNS 불가.** §0-B 참조
+- [x] 0.3 `appdata` 경로 생성 — `/mnt/user/appdata/todays-detective/` 하위 5개 디렉터리 (물리 위치 `disk3`). §0-C 참조
 - [x] 0.4 ~~(선택) Atlas 스냅샷 + `aws s3 sync`로 폐기 전 사본~~ — **불가 확인**. §0-A 참조
 - [x] 0.5 신규 시크릿 생성 — `.env.unraid` 생성 (gitignore 대상). Mongo root/app 비밀번호, MinIO 루트 자격증명, `API_KEY_ADMIN`, 신규 `ADMIN_PASSWORD`
 - [ ] 0.6 **유효한 `GEMINI_API_KEY` 확보** — Phase 2 검증의 하드 블로커 (§0-A)
@@ -186,6 +180,68 @@
 1. Vercel 프로젝트 → Settings → Environment Variables
 2. AWS Lambda `todays-detective-api` → Configuration → Environment variables
 3. 위 두 곳도 무효면 신규 발급 (Gemini: Google AI Studio)
+
+#### §0-B. NPM이 기본 `bridge`에 있어 컨테이너명 DNS가 불가 (결정: docker0 바인드)
+
+```
+Nginx-Proxy-Manager-Official   NetworkMode: bridge   IP: 172.17.0.3
+```
+
+Docker 임베디드 DNS는 **user-defined 네트워크에서만** 컨테이너명을 해석한다. 기본 `bridge`에 있는 NPM은 `todays-detective-web`이라는 이름을 알 수 없다 → 초안의 "Forward Hostname = 컨테이너명" 전제가 성립하지 않는다.
+
+**결정: docker0 게이트웨이(`172.17.0.1`)에만 포트를 바인드한다.**
+
+```yaml
+# todays-detective-web
+ports: ["172.17.0.1:3100:3000"]
+# todays-detective-minio
+ports: ["172.17.0.1:9100:9000"]
+```
+
+- NPM(172.17.0.3, bridge)은 `172.17.0.1:3100`에 도달할 수 있다
+- **LAN(192.168.0.x)에서는 도달 불가** — `172.17.0.1`은 LAN에서 라우팅되지 않는다. §3-3의 보안 수준이 유지된다
+- 컨테이너 재생성·재부팅에도 유지된다 (User Scripts 훅 같은 취약한 장치가 필요 없다)
+- ⚠️ **호스트 3000번은 NPM이 이미 점유**(`0.0.0.0:3000->3000`) → 웹은 **3100**, MinIO는 **9100**을 쓴다
+- `todays-detective-api`, `todays-detective-mongo`는 **포트를 전혀 공개하지 않는다**
+
+검토했으나 채택하지 않은 대안:
+- `docker network connect`로 NPM을 스택 네트워크에 추가 → 컨테이너명 DNS는 깔끔해지지만 **NPM 컨테이너 재생성 시 끊어짐**
+- `0.0.0.0`으로 공개 → 가장 단순하나 웹·이미지 서버가 LAN에 직접 노출됨
+
+#### §0-C. appdata는 array(disk3)에 있음 (결정: 그대로 사용)
+
+```
+appdata share: shareUseCache="no", shareInclude="disk3"   → HDD
+cache pool   : sdc1 단일 ZFS, 444G 중 443G 여유 (거의 미사용)
+```
+
+초안은 "cache 풀(SSD)에 배치"를 권고했으나, **기존 appdata(array)를 그대로 쓰기로 결정**했다.
+
+- 이 게임의 DB 부하는 사건 생성 1회 + 조회 약건 수준이라 HDD로도 실사용에 지장이 없을 것으로 판단
+- array는 **parity 보호**를 받는다. cache 풀은 `sdc1` 단일 디스크 ZFS로 이중화가 없다
+- 기존 컨테이너(immich·NPM 등) 전체에 영향을 주는 share 설정 변경을 이 프로젝트 부산물로 하지 않는다
+
+생성된 경로 (`disk3`에 실체):
+```
+/mnt/user/appdata/todays-detective/
+├── mongo/data     # Mongo 데이터
+├── mongo/config   # Mongo 설정
+├── mongo/init     # /docker-entrypoint-initdb.d 마운트 (Phase 1.3 앱 계정 스크립트)
+├── minio/data     # MinIO 객체
+└── backup/        # mongodump 산출물 (Phase 4.7)
+```
+
+#### §0-D. 확인된 서버 환경
+
+| 항목 | 값 |
+|---|---|
+| unraid | 7.3.2 (커널 6.18.38) |
+| Docker | 29.5.3 / Compose v5.1.2 |
+| CPU | Intel i3-9100F (x86_64) — arm64 대상이던 `lambda/build.sh`는 무의미 |
+| Compose Manager 플러그인 | 설치됨 (`immich` 프로젝트 운영 중) |
+| 호스트 점유 포트 | 180, 181, 1443, 2283, 3000(NPM), 8080 |
+| docker0 | 172.17.0.1 |
+| SSH | `ssh unraid` (키 인증, `~/.ssh/unraid_todays_detective`) |
 
 ### Phase 1 — 데이터 계층 부팅 (개발 PC에서 선검증)
 
@@ -295,20 +351,20 @@ server/
 ### Phase 4 — unraid 배포 + NPM 설정
 
 - [ ] 4.1 unraid **Docker Compose Manager** 플러그인에 스택 등록 (unraid는 swarm 미지원 — 단일 compose)
-- [ ] 4.2 네트워크 2개 구성
+- [ ] 4.2 네트워크 구성 — **단일 user-defined 네트워크 + docker0 포트 바인드** (§0-B)
   ```yaml
   networks:
-    todays-detective-net:          # 스택 내부 통신
-    npm-proxy:
-      external: true
-      name: <Phase 0.2에서 확인한 NPM 네트워크명>
+    todays-detective-net:          # 스택 전체가 이 네트워크 하나만 사용
   ```
-  - `todays-detective-web`, `todays-detective-minio` → 두 네트워크 모두 연결
-  - `todays-detective-api`, `todays-detective-mongo` → **내부 네트워크만**
-  - ⚠️ 내부 네트워크에 `internal: true`를 **쓰지 말 것** — api가 Gemini API로 나가는 egress가 막힌다. 포트를 host에 publish하지 않는 것으로 충분히 격리된다
+  - 4개 서비스 전부 `todays-detective-net`에 연결 (컨테이너명 DNS는 스택 내부에서만 필요)
+  - NPM 도달용 포트만 docker0에 바인드:
+    - `todays-detective-web`   → `172.17.0.1:3100:3000`
+    - `todays-detective-minio` → `172.17.0.1:9100:9000`
+  - `todays-detective-api`, `todays-detective-mongo` → **포트 공개 없음**
+  - ⚠️ 네트워크에 `internal: true`를 **쓰지 말 것** — api가 Gemini API로 나가는 egress가 막힌다
 - [ ] 4.3 `.env`를 `/mnt/user/appdata/todays-detective/.env`에 배치, 권한 `600`, compose에서 `env_file`로 참조
 - [ ] 4.4 `docker compose up -d` → `docker exec todays-detective-web wget -qO- http://todays-detective-api:8000/healthz`로 내부 연결 확인
-- [ ] 4.5 **어떤 서비스도 `ports:`로 host에 노출하지 않는다.** NPM이 컨테이너명으로 직접 도달한다
+- [ ] 4.5 포트 공개는 §0-B의 docker0 바인드 2개로 한정. `0.0.0.0` 바인드는 쓰지 않는다
 - [ ] 4.6 전 서비스 `restart: unless-stopped`, 이미지 태그 **고정** (`latest` 금지 — 재부팅 시 예고 없는 메이저 업그레이드 방지)
 - [ ] 4.7 백업 구성
   - unraid **CA Appdata Backup** 플러그인에 `todays-detective` 포함
@@ -324,8 +380,8 @@ server/
 |---|---|---|
 | Details | Domain Names | `detective.example.com` |
 | Details | Scheme | `http` |
-| Details | Forward Hostname | `todays-detective-web` |
-| Details | Forward Port | `3000` |
+| Details | Forward Hostname | `172.17.0.1` |
+| Details | Forward Port | `3100` |
 | Details | Block Common Exploits | ✅ |
 | Details | Websockets Support | ✅ |
 | SSL | SSL Certificate | Let's Encrypt (신규 발급) |
@@ -346,8 +402,8 @@ proxy_read_timeout    300s;
 |---|---|---|
 | Details | Domain Names | `cdn.detective.example.com` |
 | Details | Scheme | `http` |
-| Details | Forward Hostname | `todays-detective-minio` |
-| Details | Forward Port | `9000` |
+| Details | Forward Hostname | `172.17.0.1` |
+| Details | Forward Port | `9100` |
 | Details | Block Common Exploits | ✅ |
 | SSL | SSL Certificate | Let's Encrypt |
 | SSL | Force SSL / HTTP/2 | ✅ |
@@ -356,14 +412,7 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 `https://cdn.detective.example.com/todays-detective/portraits/<uuid>.jpg`
 캐시 헤더는 업로드 시 객체에 이미 박히므로 NPM에서 추가 설정할 것이 없다.
 
-**전제 조건**: NPM 컨테이너와 이 스택이 **같은 docker 네트워크**에 있어야 Forward Hostname이 컨테이너명으로 해석된다 (Phase 4.2).
-
-<details>
-<summary>네트워크를 공유하고 싶지 않은 경우 (Option B)</summary>
-
-`todays-detective-web`에 `ports: ["3000:3000"]`, `todays-detective-minio`에 `["9000:9000"]`을 열고, NPM의 Forward Hostname을 **unraid 호스트 IP**(예: `192.168.1.10`)로 지정한다.
-단점: 포트가 LAN 전체에 열리고, unraid 방화벽 규칙을 따로 관리해야 한다. 권장하지 않는다.
-</details>
+**Forward Hostname이 컨테이너명이 아니라 `172.17.0.1`인 이유**: NPM이 기본 `bridge`에 있어 컨테이너명 DNS를 쓸 수 없다. 상세와 대안 검토는 §0-B.
 
 ### Phase 5 — 보안 하드닝
 
@@ -412,6 +461,8 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 | `ADMIN_PASSWORD` | ✅ | ✅ | 난수 | Phase 5.4에서 api로 이동 |
 | `MONGO_INITDB_ROOT_USERNAME` / `PASSWORD` | | | | mongo 서비스 전용 |
 | `MINIO_ROOT_USER` / `PASSWORD` | | | | minio·minio-init 전용 |
+
+> 실제 값은 `.env.unraid`(Phase 0.5 생성, gitignore 대상)에 있다. 배포 시 `/mnt/user/appdata/todays-detective/.env`로 복사한다.
 | ~~`NEXT_PUBLIC_API_URL`~~ | | | — | **폐기** (same-origin `/server/*`) |
 | ~~`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_REGION`~~ | | | — | **폐기** |
 
@@ -422,6 +473,7 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 **인프라**
 1. `docker compose ps` — 5개 중 4개 running, `todays-detective-minio-init`은 exited(0)
 2. `todays-detective-{api,mongo}`가 host에 포트를 열지 않았음 (`docker ps` PORTS 비어 있음)
+3. `web`/`minio`의 공개 포트가 `172.17.0.1`에만 바인드됨 — LAN(`192.168.0.21:3100`)에서는 연결 거부
 3. 외부에서 `api.` 서브도메인이 존재하지 않음 / API에 도달 불가
 4. `docker exec todays-detective-api python -c "import boto3..."` 로 MinIO 연결 확인
 
@@ -461,10 +513,10 @@ MinIO는 path-style이므로 최종 이미지 URL은 버킷명이 경로에 포�
 | **평가 정규식 이식 오류** | 모든 추리가 `F` / "보고서 생성 실패" | 정규식·폴백 문구를 원문 그대로 복사, 실제 Gemini 응답 픅스처로 테스트 |
 | **생성 요청이 곧 실비** | 모든 `start`가 Gemini+Imagen 호출. 공개 도메인이므로 봇 한 대에 비용 폭증 | Phase 5.5 레이트 리밋을 **배포와 동시에** 적용. 나중으로 미루지 않는다 |
 | NPM 기본 60초 타임아웃 | 사건 생성이 502로 끊김 | NPM Advanced에 `proxy_read_timeout 300s` (§Phase 4 NPM 설정) |
-| NPM과 네트워크 미공유 | Forward Hostname이 해석 안 됨 → 502 | Phase 0.2 → 4.2. 안 되면 Option B |
+| NPM이 기본 bridge에 있어 컨테이너명 미해석 | Forward Hostname 오설정 시 502 | §0-B — `172.17.0.1:3100/9100`으로 지정 |
 | `NEXT_PUBLIC_*` 빌드 타임 박힘 | 잘못된 주소가 이미지에 고정 | Phase 3.5로 클라이언트에서 완전 제거 |
 | Route Handler가 rewrite를 가림 | `/server/*` 프록시 무동작 | Phase 3.2 순서 준수 (`app/api/game/` 삭제 먼저) |
-| unraid array(HDD)에 Mongo 배치 | 심각한 성능 저하 | Phase 0.3 — cache 풀 강제 |
+| array(HDD)에 Mongo 배치 (의도된 결정) | 쓰기 지연. 다만 이 워크로드는 부하가 낮아 실사용 지장은 낮다 | §0-C. 체감 저하 시 `/mnt/cache`로 이전 검토 |
 | 단일 서버 = 단일 장애점 | Vercel/Atlas의 가용성 상실 | 감수 (개인 프로젝트). 백업·복원 리허설로 보완 |
 | 가정용 회선 IP 변동 | 도메인이 끊김 | DDNS. 문제 지속 시 Cloudflare Tunnel 검토 |
 | 데이터 폐기 결정 철회 | 기존 시나리오 복구 불가 | Phase 0.4 보험 사본 + **Phase 6까지 AWS 자원 유지** |
