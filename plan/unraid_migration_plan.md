@@ -155,7 +155,7 @@
 
 ### Phase 0 — 준비
 
-- [ ] 0.1 도메인 2개 확보: `detective.example.com`(웹), `cdn.detective.example.com`(이미지)
+- [x] 0.1 도메인 2개 확보 — `detective.mintflavor.ddns.net`(웹), `cdn.mintflavor.ddns.net`(이미지). Phase 4에서 확정
 - [x] 0.2 NPM 네트워크 확인 — **기본 `bridge`에 있음 → 컨테이너명 DNS 불가.** §0-B 참조
 - [x] 0.3 `appdata` 경로 생성 — `/mnt/user/appdata/todays-detective/` 하위 5개 디렉터리 (물리 위치 `disk3`). §0-C 참조
 - [x] 0.4 ~~(선택) Atlas 스냅샷 + `aws s3 sync`로 폐기 전 사본~~ — **불가 확인**. §0-A 참조
@@ -440,8 +440,8 @@ server/
 │       └── feedbacks.py   # /feedbacks CRUD
 ```
 
-- [ ] 2.1 `config.py` + `db.py` — `authMechanism` 제거, `MONGODB_URL`을 SCRAM URI로
-- [ ] 2.2 `storage.py` — MinIO 대응
+- [x] 2.1 `config.py` + `db.py` — `authMechanism` 제거, `MONGODB_URL`을 SCRAM URI로
+- [x] 2.2 `storage.py` — MinIO 대응
   ```python
   boto3.client("s3",
       endpoint_url=settings.s3_endpoint_url,           # http://todays-detective-minio:9000
@@ -536,7 +536,7 @@ FastAPI는 422를 반환한다.
 
 라우터 3개에 `TODO(Phase 5.2)` 주석으로 인증이 필요한 지점을 표시했다
 (`POST /scenarios`, `DELETE /scenarios/{id}`, `DELETE /feedbacks/{id}`).
-- [ ] 2.7 `Dockerfile` — `python:3.12-slim`, non-root 유저, `uvicorn --host 0.0.0.0 --port 8000`
+- [x] 2.7 `Dockerfile` — `python:3.12-slim`, non-root 유저, `uvicorn --host 0.0.0.0 --port 8000`
 - [x] 2.8 **pytest 회귀 테스트 — 158건 전부 통과** (§2-F)
 
 #### §2-F. Phase 2-F 결과
