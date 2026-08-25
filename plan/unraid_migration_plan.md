@@ -164,8 +164,28 @@
   /mnt/user/appdata/todays-detective/{mongo/data,mongo/config,minio/data}
   ```
   **cache 풀(SSD)에 위치**시킬 것. array(HDD)에 두면 Mongo 성능이 크게 떨어진다
-- [ ] 0.4 (선택) Atlas 스냅샷 + `aws s3 sync`로 폐기 전 사본 1회 — 데이터를 버리기로 했지만, Gemini 비용으로 만든 시나리오라 되돌리고 싶어질 수 있다. 보험으로만
-- [ ] 0.5 신규 시크릿 생성 — Mongo 비밀번호, MinIO 루트 자격증명, `API_KEY_ADMIN`, 신규 `ADMIN_PASSWORD`
+- [x] 0.4 ~~(선택) Atlas 스냅샷 + `aws s3 sync`로 폐기 전 사본~~ — **불가 확인**. §0-A 참조
+- [x] 0.5 신규 시크릿 생성 — `.env.unraid` 생성 (gitignore 대상). Mongo root/app 비밀번호, MinIO 루트 자격증명, `API_KEY_ADMIN`, 신규 `ADMIN_PASSWORD`
+- [ ] 0.6 **유효한 `GEMINI_API_KEY` 확보** — Phase 2 검증의 하드 블로커 (§0-A)
+
+#### §0-A. 로컬 `.env` 자격증명 전량 만료 (2026-08-25 확인)
+
+로컬 `.env`의 키를 실제로 호출해 검증한 결과 **전부 죽어 있다**:
+
+| 키 | 결과 |
+|---|---|
+| `AWS_ACCESS_KEY_ID` / `SECRET` | `InvalidClientTokenId` — STS·S3 모두 거부 |
+| `GEMINI_API_KEY` | `API_KEY_INVALID` — "API key not valid" |
+
+**영향**
+- Phase 0.4 보험 백업 불가 → **데이터 폐기 결정이 사실상 유일한 선택지**가 됐다 (되돌릴 자격증명이 없음)
+- Phase 2에서 사건 생성·심문·평가를 **테스트할 수 없다** → 유효한 Gemini 키 확보가 선행 조건
+- Phase 5.7의 "AWS 키 로테이션"은 무의미해졌다 (이미 무효). 자원 삭제만 남음
+
+**주의**: 이는 **로컬 파일이 낡았다는 뜻일 뿐**, 운영 환경이 죽었다는 뜻은 아니다. Vercel과 Lambda는 각자 대시보드/콘솔에 설정된 환경변수를 쓴다. 실제 유효한 값은 다음에서 확보한다:
+1. Vercel 프로젝트 → Settings → Environment Variables
+2. AWS Lambda `todays-detective-api` → Configuration → Environment variables
+3. 위 두 곳도 무효면 신규 발급 (Gemini: Google AI Studio)
 
 ### Phase 1 — 데이터 계층 부팅 (개발 PC에서 선검증)
 
@@ -179,6 +199,15 @@
   > MinIO 커뮤니티 에디션은 2025년 이후 웹 콘솔 기능이 축소됐다. **`mc` CLI 기준으로 운영**하고 콘솔에 의존하지 않는 것이 안전하다.
   > 익명 read는 **`portraits/` 프리픽스에만** 부여한다. 버킷 전체 공개 금지
 - [ ] 1.3 Mongo 접속 확인 — SCRAM 자격증명으로 `todays_detective` DB 생성 (컬렉션은 첫 삽입 시 자동 생성)
+  - ⚠️ `.env.unraid`의 `MONGODB_URL`은 **앱 전용 계정**(`detective`, `authSource=todays_detective`)을 쓴다. mongo 공식 이미지의 entrypoint는 `admin` DB에 root 계정만 만들므로, 앱 계정은 초기화 스크립트로 따로 생성해야 한다
+  - `/docker-entrypoint-initdb.d/01-app-user.js` 를 마운트 (볼륨이 빈 첫 부팅에만 실행됨)
+    ```js
+    db = db.getSiblingDB("todays_detective");
+    db.createUser({ user: process.env.MONGO_APP_USERNAME,
+                    pwd:  process.env.MONGO_APP_PASSWORD,
+                    roles: [{ role: "readWrite", db: "todays_detective" }] });
+    ```
+  - root 계정으로 단순화하고 싶다면 `MONGODB_URL`을 `root:...@.../?authSource=admin`으로 바꾸면 되지만, 최소 권한 원칙에서 벗어난다
 - [ ] 1.4 `mc cp`로 더미 이미지 1장 업로드 → 익명 URL로 GET 200 확인
 
 ### Phase 2 — FastAPI 서비스 작성 (가장 큰 작업)
