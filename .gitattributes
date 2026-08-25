@@ -1,0 +1,9 @@
+# Linux 컨테이너로 배포되는 파일은 반드시 LF를 유지해야 한다.
+# Windows 체크아웃에서 CRLF로 바뀌면 셸 스크립트가 "bad interpreter"로 실패한다.
+*.sh          text eol=lf
+*.yml         text eol=lf
+*.yaml        text eol=lf
+Dockerfile    text eol=lf
+Dockerfile.*  text eol=lf
+.env.*        text eol=lf
+*.py          text eol=lf

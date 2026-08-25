@@ -109,6 +109,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
               {(showTruth || evaluation.isCorrect) && evaluation.culpritImage ? (
                 <Image
                   src={evaluation.culpritImage.startsWith('http') ? evaluation.culpritImage : `data:image/jpeg;base64,${evaluation.culpritImage}`}
+                  unoptimized
                   alt="Culprit"
                   fill
                   className="object-cover grayscale contrast-125"
@@ -299,6 +300,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
                         {s.portraitImage ? (
                           <Image
                             src={s.portraitImage.startsWith('http') ? s.portraitImage : `data:image/jpeg;base64,${s.portraitImage}`}
+                            unoptimized
                             alt={s.name}
                             fill
                             className="object-cover"

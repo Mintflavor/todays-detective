@@ -1,0 +1,19 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.*
+Dockerfile
+.dockerignore
+
+# 컨테이너에 들어갈 이유가 없는 것들
+infra/
+server/
+plan/
+.agent/
+.claude/
+.playwright-mcp/
+coverage/
+*.tsbuildinfo
+npm-debug.log*

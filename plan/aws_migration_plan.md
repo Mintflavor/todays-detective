@@ -1,5 +1,11 @@
 # AWS S3 + MongoDB Atlas 마이그레이션 계획
 
+> ⚠️ **과거 이력 문서 — 현행 아님.**
+> AWS S3 + MongoDB Atlas로 이전할 때의 계획이다. **현재 구조가 아니다** — S3는 MinIO로, Atlas는 자체 호스팅 MongoDB로 다시 이전했다.
+>
+> 현재 구조는 [unraid_migration_plan.md](unraid_migration_plan.md)와
+> 레포 루트의 [CLAUDE.md](../CLAUDE.md)를 본다.
+
 ## Context
 
 현재 용의자 초상화 이미지가 Base64 문자열로 MongoDB의 `case_data.suspects[].portraitImage` 필드에 인라인 저장된다. 이로 인해 시나리오 1건당 MongoDB 문서 크기가 이미지 3장(각 약 50~100KB Base64) 때문에 불필요하게 커지고, 네트워크 응답도 느려진다.

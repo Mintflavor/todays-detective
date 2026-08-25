@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import AssetPreloader from "./components/AssetPreloader";
-import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: "오늘의 탐정",
@@ -18,7 +17,6 @@ export default function RootLayout({
       <body className="font-serif bg-gray-950 text-gray-100 antialiased">
         <AssetPreloader />
         {children}
-        <Analytics />
       </body>
     </html>
   );

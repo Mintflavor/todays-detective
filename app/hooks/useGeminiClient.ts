@@ -1,4 +1,11 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 import { useState } from 'react';
+import { API_BASE, errorMessage } from '../lib/http';
 import { CaseData, Evaluation } from '../types/game';
 
 interface UseGeminiClientReturn {
@@ -34,13 +41,13 @@ export default function useGeminiClient(): UseGeminiClientReturn {
 
   const generateCase = async (): Promise<CaseData> => {
     return withErrorHandling(async () => {
-      const response = await fetch('/api/game/start', {
+      const response = await fetch(`${API_BASE}/api/game/start`, {
         method: 'POST',
       });
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to generate case");
+        throw new Error(errorMessage(data, "Failed to generate case"));
       }
 
       if (data && data.caseData) {
@@ -62,7 +69,7 @@ export default function useGeminiClient(): UseGeminiClientReturn {
     userMsg: string
   ): Promise<string> => {
     return withErrorHandling(async () => {
-      const response = await fetch('/api/game/chat', {
+      const response = await fetch(`${API_BASE}/api/game/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -76,7 +83,7 @@ export default function useGeminiClient(): UseGeminiClientReturn {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to interrogate suspect");
+        throw new Error(errorMessage(data, "Failed to interrogate suspect"));
       }
 
       return data.reply;
@@ -90,7 +97,7 @@ export default function useGeminiClient(): UseGeminiClientReturn {
     isOverTime: boolean
   ): Promise<Evaluation> => {
     return withErrorHandling(async () => {
-      const response = await fetch('/api/game/evaluate', {
+      const response = await fetch(`${API_BASE}/api/game/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,7 +113,7 @@ export default function useGeminiClient(): UseGeminiClientReturn {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to evaluate deduction");
+        throw new Error(errorMessage(data, "Failed to evaluate deduction"));
       }
 
       return {

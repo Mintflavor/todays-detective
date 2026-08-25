@@ -1,0 +1,165 @@
+# 작성자 : 박현일
+# 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+#
+# Author: Hyunil Park
+# Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+#
+# Today's Detective — unraid 스택
+# Phase 1: 데이터 계층 (mongo, minio)
+# Phase 2: api (FastAPI). web은 Phase 3에서 추가된다.
+#
+# 배치 위치 : /mnt/user/appdata/todays-detective/compose/docker-compose.yml
+# 시크릿    : 같은 디렉터리의 .env (권한 600). /boot은 vfat이라 권한이 없어 쓰지 않는다.
+# unraid UI : Compose Manager의 indirect 모드로 이 디렉터리를 가리킨다. infra/README.md 참조
+
+name: todays-detective
+
+services:
+  # ───────────────────────────── MongoDB ─────────────────────────────
+  todays-detective-mongo:
+    container_name: todays-detective-mongo
+    image: mongo:8.0.29
+    restart: unless-stopped
+    # 포트를 공개하지 않는다 — 스택 내부 네트워크에서만 접근한다.
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      # 아래 두 개는 01-app-user.sh가 앱 전용 계정을 만들 때 사용한다.
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    volumes:
+      - /mnt/user/appdata/todays-detective/mongo/data:/data/db
+      - /mnt/user/appdata/todays-detective/mongo/config:/data/configdb
+      # 볼륨이 비어 있는 첫 부팅에만 실행된다.
+      - /mnt/user/appdata/todays-detective/mongo/init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - todays-detective-net
+    healthcheck:
+      # ping은 인증 없이 허용되는 명령이다.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ───────────────────────────── MinIO ──────────────────────────────
+  todays-detective-minio:
+    container_name: todays-detective-minio
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - /mnt/user/appdata/todays-detective/minio/data:/data
+    ports:
+      # docker0 게이트웨이에만 바인드한다. NPM(기본 bridge, 172.17.0.3)은 도달하지만
+      # LAN(192.168.0.x)에서는 172.17.0.1이 라우팅되지 않아 노출되지 않는다.
+      # 호스트 9000이 아니라 9100을 쓰는 이유는 계획 §0-B 참조.
+      - "172.17.0.1:9100:9000"
+      # 콘솔(9001)은 의도적으로 공개하지 않는다. 필요 시 docker exec으로 접근한다.
+    networks:
+      - todays-detective-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ──────────────── MinIO 초기화 (1회성) ────────────────
+  # 버킷 생성 + portraits/ 프리픽스에만 익명 read 부여.
+  # 멱등하므로 스택을 다시 올려도 안전하다.
+  todays-detective-minio-init:
+    container_name: todays-detective-minio-init
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    depends_on:
+      todays-detective-minio:
+        condition: service_started
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: todays-detective
+    # mc 이미지의 기본 entrypoint가 mc라서 셸로 덮어쓴다.
+    entrypoint: ["/bin/sh", "/opt/init/init.sh"]
+    volumes:
+      - /mnt/user/appdata/todays-detective/minio-init:/opt/init:ro
+    networks:
+      - todays-detective-net
+
+  # ───────────────────────────── API ───────────────────────────────
+  todays-detective-api:
+    container_name: todays-detective-api
+    build:
+      context: ../server           # /mnt/user/appdata/todays-detective/server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 포트를 공개하지 않는다 — web의 same-origin rewrite로만 접근한다. (계획 §3-3)
+    environment:
+      MONGODB_URL: ${MONGODB_URL}
+      MONGODB_DATABASE: todays_detective
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL}
+      IMAGE_MODEL: ${IMAGE_MODEL}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      PUBLIC_ASSET_BASE_URL: ${PUBLIC_ASSET_BASE_URL}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      API_KEY_ADMIN: ${API_KEY_ADMIN}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # 레이트 리밋 (예산 보호). 상세 근거는 app/ratelimit.py 주석 참조.
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED}
+      RATE_LIMIT_STORAGE_URI: ${RATE_LIMIT_STORAGE_URI}
+      RATE_LIMIT_START_GLOBAL: ${RATE_LIMIT_START_GLOBAL}
+      RATE_LIMIT_CHAT: ${RATE_LIMIT_CHAT}
+      RATE_LIMIT_EVALUATE: ${RATE_LIMIT_EVALUATE}
+      LOG_LEVEL: INFO
+    depends_on:
+      todays-detective-mongo:
+        condition: service_healthy
+      todays-detective-minio:
+        condition: service_healthy
+    networks:
+      - todays-detective-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=4).status==200 else 1)"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
+  # ───────────────────────────── WEB ───────────────────────────────
+  todays-detective-web:
+    container_name: todays-detective-web
+    build:
+      context: ../web             # /mnt/user/appdata/todays-detective/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # 환경변수가 없다. 관리자 인증이 api로 이동해 web은 더 이상 비밀값을 갖지 않는다.
+    # (Route Handler 전무 — app/api/ 디렉터리 자체가 사라졌다)
+    ports:
+      # docker0에만 바인드. NPM(기본 bridge)은 도달하지만 LAN에서는 닿지 않는다. (§0-B)
+      # 호스트 3000은 NPM이 점유 중이라 3100을 쓴다.
+      - "172.17.0.1:3100:3000"
+    depends_on:
+      todays-detective-api:
+        condition: service_healthy
+    networks:
+      - todays-detective-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 6s
+      retries: 5
+      start_period: 20s
+
+networks:
+  # 단일 user-defined 네트워크. 컨테이너명 DNS는 스택 내부에서만 필요하다.
+  # internal: true 는 쓰지 않는다 — Phase 2의 api가 Gemini API로 나가는 egress가 막힌다.
+  todays-detective-net:
+    name: todays-detective-net

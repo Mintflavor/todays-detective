@@ -1,14 +1,22 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 export interface Suspect {
   id: number;
   name: string;
   role: string;
   gender?: 'Male' | 'Female' | 'Unknown';
   age?: number;
-  portraitImage?: string; // Base64 string
+  portraitImage?: string; // S3/MinIO URL (구 데이터는 Base64 문자열)
   image_prompt_keywords?: string;
   personality: string;
-  secret: string;
-  isCulprit: boolean;
+  // 아래 두 필드는 서버 정화본에 **존재하지 않는다** (SPOILER_SUSPECT_FIELDS).
+  // 관리자 화면이 원본을 직접 조회할 때만 채워진다.
+  secret?: string;
+  isCulprit?: boolean;
   real_action?: string;
   alibi_claim?: string;
   motive?: string;
@@ -37,11 +45,13 @@ export interface CaseData {
   summary: string;
   crime_type: string; // e.g., "Murder", "Theft", "Arson"
   world_setting: WorldSetting;
-  timeline_truth: string[];
+  // 서버 정화본에 없다 (SPOILER_TOP_FIELDS). 관리자 원본 조회에서만 채워진다.
+  timeline_truth?: string[];
   victim_info: VictimInfo;
   evidence_list: Evidence[];
   suspects: Suspect[];
-  solution: string;
+  // 서버 정화본에 없다. 추리 평가 응답의 Evaluation.truth로만 노출된다.
+  solution?: string;
   scenarioId?: string; // Add scenarioId
   caseNumber?: string;
 }
