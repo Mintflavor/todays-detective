@@ -261,9 +261,9 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             currentSuspectId={mockCurrentSuspectId}
             setCurrentSuspectId={setMockCurrentSuspectId}
             chatLogs={mockChatLogs}
-            actionPoints={5}
+            actionPoints={{ 1: 14, 2: 5, 3: 0 }}
             totalActionPoints={20}
-            timerSeconds={600}
+            timerSeconds={1200}
             isOverTime={false}
             showTimeOverModal={false}
             closeTimeOverModal={() => {}}
@@ -287,10 +287,10 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             setDeductionInput={setMockDeductionInput} 
             onSubmit={() => alert("Submit Deduction")}
             onBack={() => setTestScreen('NONE')}
-            timerSeconds={600}
+            timerSeconds={1200}
             isOverTime={false}
-            actionPoints={5}
-            totalActionPoints={20}
+            actionPoints={19}
+            totalActionPoints={60}
           />
         ) : null;
       case 'RESOLUTION':

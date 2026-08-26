@@ -51,7 +51,9 @@ interface InvestigationScreenProps {
   currentSuspectId: number;
   setCurrentSuspectId: (id: number) => void;
   chatLogs: ChatLogs;
-  actionPoints: number;
+  /** 용의자 id -> 남은 심문 횟수. AP는 공유 풀이 아니라 용의자마다 따로다. */
+  actionPoints: Record<number, number>;
+  /** 용의자 1명당 총 횟수. */
   totalActionPoints: number;
   timerSeconds: number;
   isOverTime: boolean;
@@ -96,22 +98,26 @@ function Paperclip() {
 }
 
 /**
- * 행동력을 눈금으로 보여준다.
- * 숫자만 있으면 남은 양이 몸으로 느껴지지 않는다 — 칸이 하나씩 꺼진다.
- * 총량이 사건마다 다를 수 있으므로 flex-1로 폭에 맞춰 나눈다.
+ * 한 용의자에게 남은 심문 횟수를 눈금으로 보여준다.
+ * 숫자만 있으면 남은 양이 몸으로 느껴지지 않는다 — 칸이 하나씩 지워진다.
+ * 총량이 바뀔 수 있으므로 flex-1로 폭에 맞춰 나눈다 (20칸도 좁은 화면에 들어간다).
+ *
+ * 색은 **종이 위 기준**이다. 예전에는 어두운 책상 헤더에 있어서 앰버였는데,
+ * AP가 용의자에게 속하게 되면서 조서 머리로 옮겼다.
  */
 function ActionTally({ used, total }: { used: number; total: number }) {
+  const left = total - used;
   return (
-    <div className="flex h-1.5 w-full gap-[1.5px]" aria-hidden="true">
+    <div className="flex h-[5px] w-full gap-[1.5px]" aria-hidden="true">
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
           className={`flex-1 rounded-[1px] transition-colors duration-500 ${
             i < used
-              ? 'bg-black/45'
-              : total - used <= 5
+              ? 'bg-ink/12'
+              : left <= 5
                 ? 'bg-stamp'
-                : 'bg-amber-300/80'
+                : 'bg-ink/55'
           }`}
         />
       ))}
@@ -162,17 +168,20 @@ export default function InvestigationScreen({
   const log = chatLogs[currentSuspectId] ?? [];
   const answered = log.filter((m) => m.role === 'ai').length;
 
+  /** 이 용의자에게 남은 심문 횟수. 수첩은 AP를 쓰지 않는다. */
+  const remaining = isNotebook ? totalActionPoints : (actionPoints[currentSuspectId] ?? 0);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatLogs, currentSuspectId, isTyping]);
 
   // 심문이 끝나면 바로 다음 질문을 쓸 수 있게 한다.
   useEffect(() => {
-    if (!isTyping && actionPoints > 0) {
+    if (!isTyping && remaining > 0) {
       const t = setTimeout(() => inputRef.current?.focus(), 50);
       return () => clearTimeout(t);
     }
-  }, [isTyping, currentSuspectId, actionPoints]);
+  }, [isTyping, currentSuspectId, remaining]);
 
   // 서류철을 Escape로 닫는다. 뒤로가기는 usePhaseHistory가 쓰므로 건드리지 않는다.
   useEffect(() => {
@@ -184,8 +193,8 @@ export default function InvestigationScreen({
     return () => window.removeEventListener('keydown', onKey);
   }, [fileOpen]);
 
-  const inputDisabled = !isNotebook && (actionPoints <= 0 || isTyping);
-  const sendDisabled = !isNotebook && (actionPoints <= 0 || isTyping || !userInput.trim());
+  const inputDisabled = !isNotebook && (remaining <= 0 || isTyping);
+  const sendDisabled = !isNotebook && (remaining <= 0 || isTyping || !userInput.trim());
 
   return (
     <div className="td-desk relative flex h-[100dvh] flex-col overflow-hidden">
@@ -224,17 +233,6 @@ export default function InvestigationScreen({
             </div>
           </div>
 
-          {/* 행동력 */}
-          <div className="hidden w-32 shrink-0 sm:block lg:w-44">
-            <div className="mb-1 flex items-baseline justify-between">
-              <span className="font-dossier text-[9px] uppercase tracking-[0.2em] text-stone-500">행동력</span>
-              <span className={`font-type text-xs tabular-nums ${actionPoints <= 5 ? 'text-stamp' : 'text-amber-300/90'}`}>
-                {actionPoints}/{totalActionPoints}
-              </span>
-            </div>
-            <ActionTally used={totalActionPoints - actionPoints} total={totalActionPoints} />
-          </div>
-
           <button
             onClick={toggleMute}
             aria-label={isMuted ? '배경음 켜기' : '배경음 끄기'}
@@ -250,14 +248,6 @@ export default function InvestigationScreen({
           >
             범인 지목
           </button>
-        </div>
-
-        {/* 모바일 행동력 — 헤더 바닥에 붙는 한 줄 */}
-        <div className="mt-2 flex items-center gap-2 sm:hidden">
-          <span className="font-type text-[10px] tabular-nums text-stone-500">
-            AP {actionPoints}/{totalActionPoints}
-          </span>
-          <ActionTally used={totalActionPoints - actionPoints} total={totalActionPoints} />
         </div>
       </header>
 
@@ -346,8 +336,9 @@ export default function InvestigationScreen({
                     <>
                       <span>답변 {answered}건</span>
                       <span className="text-ink/20">|</span>
-                      <span className={actionPoints <= 5 ? 'text-stamp' : undefined}>
-                        심문 가능 {actionPoints}회
+                      {/* AP가 용의자에게 속하므로 조서 머리에 둔다 (예전에는 책상 헤더의 전역 수치였다) */}
+                      <span className={remaining <= 5 ? 'font-bold text-stamp' : undefined}>
+                        이 사람에게 남은 심문 {remaining}회
                       </span>
                     </>
                   )}
@@ -360,6 +351,12 @@ export default function InvestigationScreen({
                     사건 서류
                   </button>
                 </div>
+
+                {!isNotebook && (
+                  <div className="mt-2">
+                    <ActionTally used={totalActionPoints - remaining} total={totalActionPoints} />
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -383,6 +380,8 @@ export default function InvestigationScreen({
                     아직 기재된 진술이 없습니다.
                     <br />
                     아래 <span className="font-dossier font-bold text-ink-soft">문</span> 란에 질문을 적으십시오.
+                    <br />
+                    <span className="text-[12px]">이 사람에게 {remaining}회 물을 수 있습니다.</span>
                   </>
                 )}
               </p>
@@ -477,6 +476,7 @@ export default function InvestigationScreen({
 
             {caseData.suspects.map((s) => {
               const active = currentSuspectId === s.id;
+              const left = actionPoints[s.id] ?? 0;
               return (
                 <button
                   key={s.id}
@@ -510,7 +510,19 @@ export default function InvestigationScreen({
                       </span>
                     )}
                   </span>
-                  <span className="truncate font-dossier text-[11px] font-bold sm:text-xs">{s.name}</span>
+                  <span className="flex min-w-0 flex-col items-start leading-tight">
+                    <span className="truncate font-dossier text-[11px] font-bold sm:text-xs">{s.name}</span>
+                    {/* 몫이 따로이므로 어디에 여유가 남았는지 탭에서 바로 보여야 한다 */}
+                    <span
+                      className={`font-type text-[9px] tabular-nums sm:text-[10px] ${
+                        left === 0
+                          ? active ? 'text-stamp' : 'text-stone-600'
+                          : active ? 'text-ink-faint' : 'text-stone-600'
+                      }`}
+                    >
+                      {left === 0 ? '소진' : `${left}회`}
+                    </span>
+                  </span>
                 </button>
               );
             })}
@@ -535,8 +547,8 @@ export default function InvestigationScreen({
               onKeyDown={handleKeyDown}
               aria-label={isNotebook ? '수사 메모' : `${currentSuspect?.name ?? '용의자'}에게 할 질문`}
               placeholder={
-                !isNotebook && actionPoints <= 0
-                  ? '행동력이 소진되어 더 이상 심문할 수 없습니다.'
+                !isNotebook && remaining <= 0
+                  ? '이 사람에게 물을 수 있는 횟수를 다 썼습니다. 다른 용의자로 넘어가십시오.'
                   : inputPlaceholder
               }
               disabled={inputDisabled}
@@ -611,7 +623,7 @@ export default function InvestigationScreen({
               <div>
                 <h3 className="mb-2 font-dossier text-sm font-bold text-stamp">골든 타임 종료</h3>
                 <p className="font-record text-[13.5px] leading-[1.9] text-ink-soft">
-                  <span className="font-bold text-ink underline decoration-ink/40">제한 시간 10분</span>이 모두
+                  <span className="font-bold text-ink underline decoration-ink/40">제한 시간 20분</span>이 모두
                   경과했습니다. 현장에 경찰 병력이 도착하여 통제를 시작했습니다.
                 </p>
               </div>

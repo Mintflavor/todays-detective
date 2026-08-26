@@ -136,7 +136,7 @@ class TestEvidenceCount:
         assert len(counts) >= 3, "증거 개수가 고정돼 있다: %s" % counts
 
     def test_count_is_playable(self, prompts):
-        """0~1개면 추리가 불가능하고, 너무 많으면 10분 안에 소화할 수 없다."""
+        """0~1개면 추리가 불가능하고, 너무 많으면 제한 시간 안에 소화할 수 없다."""
         for p in prompts:
             n = int(_field(p, "- evidence_list 개수: 정확히").rstrip("개"))
             assert 2 <= n <= 4, "증거 개수 %d는 플레이 가능 범위를 벗어난다" % n

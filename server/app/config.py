@@ -67,7 +67,9 @@ class Settings(BaseSettings):
     #   2/hour = 순간 폭주 차단.
     rate_limit_start_global: str = "2/hour;3/day;25/month"
     # 아래 둘은 비용이 미미하므로 남용 방어 수준. 한 판 최대 20 AP = 심문 20회.
-    rate_limit_chat: str = "60/hour"
+    # 한 판이 용의자별 20회 x 3명 = 최대 60회다. 한 판이 전역 한도를 다 쓰면
+    # 다른 접속자가 수사 중에 429를 받으므로 한 판보다 넉넉해야 한다. ratelimit.py 주석 참조.
+    rate_limit_chat: str = "180/hour"
     rate_limit_evaluate: str = "15/hour"
     # 관리자 로그인 무차별 대입 방어
     rate_limit_admin_login: str = "30/hour"

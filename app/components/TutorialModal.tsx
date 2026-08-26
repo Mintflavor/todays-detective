@@ -31,8 +31,8 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
               <Clock size={18} /> 자원 및 시간
             </h3>
             <p className="text-sm leading-relaxed text-gray-800">
-              당신에게는 <span className="font-bold text-red-700">20번의 행동력(AP)</span>만 주어집니다.<br/>
-              또한 <span className="font-bold text-red-700">10분 내</span>에 해결하지 못하면, <br/>
+              <span className="font-bold text-red-700">용의자 한 명당 20번</span>씩 질문할 수 있습니다.<br/>
+              또한 <span className="font-bold text-red-700">20분 내</span>에 해결하지 못하면, <br/>
               아무리 완벽한 추리라도 <span className="underline">최대 B등급</span>만 받게 됩니다.
             </p>
           </div>

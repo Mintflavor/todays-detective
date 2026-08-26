@@ -1,6 +1,6 @@
 # 오늘의 탐정 (Today's Detective)
 
-Gemini가 생성한 사건을 10분 안에 추리하는 웹 게임. 용의자 3명을 심문해 범인을 지목하면
+Gemini가 생성한 사건을 20분 안에 추리하는 웹 게임. 용의자 3명을 심문해 범인을 지목하면
 AI가 등급(S~F)과 수사 보고서를 돌려준다.
 
 **https://detective.mintflavor.ddns.net**
@@ -29,7 +29,7 @@ AWS(Lambda·API Gateway·S3·MongoDB Atlas) + Vercel에서 자체 호스팅으�
 ## 게임 흐름
 
 ```
-intro → 브리핑 → 튜토리얼 → 수사(10분, 20 AP) → 추리 → 결과
+intro → 브리핑 → 튜토리얼 → 수사(20분, 용의자별 20회) → 추리 → 결과
                                     ↑
                         "지난 사건 기록"으로 이전 사건 재생 가능
 ```

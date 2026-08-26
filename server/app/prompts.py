@@ -421,7 +421,7 @@ def generate_suspect_prompt(suspect, world, timeline, evidence):
 
 def generate_evaluation_prompt(truth, culprit_name, chosen_suspect_name, reasoning, is_over_time):
     penalty = (
-        "\n[중요 페널티]: 탐정이 제한시간(10분)을 초과했습니다. 추리가 완벽하더라도 '시간 관리' 점수는 0점이며, 최종 등급은 최대 'B'까지만 부여할 수 있습니다."
+        "\n[중요 페널티]: 탐정이 제한시간(20분)을 초과했습니다. 추리가 완벽하더라도 '시간 관리' 점수는 0점이며, 최종 등급은 최대 'B'까지만 부여할 수 있습니다."
         if is_over_time
         else "탐정은 제한 시간 내에 추리를 완료했습니다. (시간 관리 만점: 10점)"
     )
@@ -459,7 +459,7 @@ AI가 생성한 것이라도, 기존에 설정된 사건의 진상과 다른 내
    - 0점: 동기 언급 없음 또는 오판.
 
 4. 시간 관리 (10점)
-   - 10점: 제한 시간(10분) 내 완료.
+   - 10점: 제한 시간(20분) 내 완료.
    - 0점: 제한 시간 초과.
 
 [등급 체계]

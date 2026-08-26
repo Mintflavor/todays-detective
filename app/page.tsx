@@ -31,6 +31,8 @@ export default function TodaysDetective() {
     chatLogs,
     actionPoints,
     totalActionPoints,
+    apRemainingTotal,
+    apGrandTotal,
     evaluation,
     userInput,
     isTyping,
@@ -180,8 +182,9 @@ export default function TodaysDetective() {
           onBack={() => setPhase('investigation')}
           timerSeconds={timerSeconds}
           isOverTime={isOverTime}
-          actionPoints={actionPoints}
-          totalActionPoints={totalActionPoints}
+          /* 추리 화면은 용의자별 잔량이 아니라 전체 소진 정도를 보여준다 */
+          actionPoints={apRemainingTotal}
+          totalActionPoints={apGrandTotal}
         />
       )}
 
