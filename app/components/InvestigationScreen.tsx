@@ -40,7 +40,7 @@ import React, { useRef, useEffect, useState, KeyboardEvent, ChangeEvent } from '
 import Image from 'next/image';
 import {
   Volume2, VolumeX, AlertTriangle, Notebook, User, Send,
-  Stamp, FolderOpen, X, PenLine,
+  Stamp, FolderOpen, X, PenLine, Maximize2,
 } from 'lucide-react';
 import { CaseData, ChatLogs } from '../types/game';
 import { formatTime } from '../lib/utils';
@@ -71,6 +71,14 @@ interface InvestigationScreenProps {
   onGoToDeduction: () => void;
 }
 
+/**
+ * 초상화 주소. 구 데이터에는 `portraitImage`가 base64 문자열인 것이 있다
+ * (지금은 MinIO URL). 분기가 세 곳에 흩어져 있었으므로 여기로 모았다.
+ */
+function portraitSrc(portrait: string): string {
+  return portrait.startsWith('http') ? portrait : `data:image/jpeg;base64,${portrait}`;
+}
+
 /** 조서 번호. 서버가 caseNumber를 주지 않으면 시나리오 id 끝자리로 만든다. */
 function recordNumber(caseData: CaseData): string {
   if (caseData.caseNumber) return caseData.caseNumber;
@@ -84,7 +92,7 @@ function Paperclip() {
     <svg
       viewBox="0 0 24 48"
       aria-hidden="true"
-      className="absolute -top-3.5 left-1.5 h-9 w-[18px] rotate-[-8deg] text-slate-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.45)] sm:-top-4 sm:h-11 sm:w-5"
+      className="absolute -top-3.5 left-1.5 h-9 w-[1.125rem] rotate-[-8deg] text-slate-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.45)] sm:-top-4 sm:h-11 sm:w-5"
     >
       <path
         d="M6 31V11a6 6 0 0 1 12 0v25a9 9 0 0 1-18 0V15"
@@ -108,7 +116,7 @@ function Paperclip() {
 function ActionTally({ used, total }: { used: number; total: number }) {
   const left = total - used;
   return (
-    <div className="flex h-[5px] w-full gap-[1.5px]" aria-hidden="true">
+    <div className="flex h-[0.3125rem] w-full gap-[1.5px]" aria-hidden="true">
       {Array.from({ length: total }, (_, i) => (
         <span
           key={i}
@@ -129,8 +137,74 @@ function ActionTally({ used, total }: { used: number; total: number }) {
 function PunchHoles() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-[0.7rem] sm:left-[1.1rem]">
-      <span className="td-punch absolute top-[16%] block h-[9px] w-[9px] rounded-full sm:h-[11px] sm:w-[11px]" />
-      <span className="td-punch absolute top-[58%] block h-[9px] w-[9px] rounded-full sm:h-[11px] sm:w-[11px]" />
+      <span className="td-punch absolute top-[16%] block h-[0.5625rem] w-[0.5625rem] rounded-full sm:h-[0.6875rem] sm:w-[0.6875rem]" />
+      <span className="td-punch absolute top-[58%] block h-[0.5625rem] w-[0.5625rem] rounded-full sm:h-[0.6875rem] sm:w-[0.6875rem]" />
+    </div>
+  );
+}
+
+/**
+ * 조서 머리의 증명사진.
+ *
+ * 조서 안에서는 세로 비율로 **잘라서** 쓴다 (얼굴이 크게 보이는 쪽이 낫다).
+ * 원본은 512x512 정사각형이라 잘린 부분이 있으므로, 누르면 자르지 않은 원본을 보여준다.
+ * 사진이 없는 용의자는 누를 것이 없으므로 버튼으로 만들지 않는다.
+ */
+function MugShot({
+  name,
+  portrait,
+  onOpen,
+}: {
+  name: string;
+  portrait?: string;
+  onOpen: () => void;
+}) {
+  const frame =
+    'relative h-[5.375rem] w-[4.25rem] overflow-hidden rounded-[1px] border border-ink/30 bg-ink/10 shadow-[0_3px_10px_rgba(0,0,0,0.4)] sm:h-[7.375rem] sm:w-[5.875rem]';
+
+  const inner = portrait ? (
+    <>
+      <Image
+        src={portraitSrc(portrait)}
+        unoptimized
+        alt={`${name} 증명사진`}
+        fill
+        className="object-cover contrast-[1.06] saturate-[0.72] sepia-[0.14] transition-transform duration-300 group-hover:scale-[1.05]"
+      />
+      {/* 인화지 광택 */}
+      <span
+        aria-hidden="true"
+        className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/20 mix-blend-overlay"
+      />
+      {/* 누를 수 있다는 표시 — 평소에는 숨긴다 (조서를 어지럽히지 않게) */}
+      <span
+        aria-hidden="true"
+        className="absolute bottom-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-ink/75 text-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+      >
+        <Maximize2 size={11} />
+      </span>
+    </>
+  ) : (
+    <div className="grid h-full w-full place-items-center text-ink-faint">
+      <User size={30} strokeWidth={1.4} />
+    </div>
+  );
+
+  return (
+    <div className="relative shrink-0 animate-[td-clip-in_0.55s_0.15s_ease-out_both]">
+      {portrait ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={`${name} 사진 크게 보기`}
+          className={`${frame} group cursor-zoom-in focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pen`}
+        >
+          {inner}
+        </button>
+      ) : (
+        <div className={frame}>{inner}</div>
+      )}
+      <Paperclip />
     </div>
   );
 }
@@ -163,6 +237,15 @@ export default function InvestigationScreen({
 
   /** 모바일 서류철. 데스크톱은 항상 펼쳐져 있으므로 이 상태를 쓰지 않는다. */
   const [fileOpen, setFileOpen] = useState(false);
+  /**
+   * 증명사진 확대 — 열린 상태를 boolean이 아니라 **어느 용의자의 사진인지**로 들고 있다.
+   *
+   * boolean으로 두면 용의자를 바꿀 때 닫아주는 effect가 필요하고(안 닫으면 방금 전
+   * 사람의 얼굴이 그대로 떠 있다), 그 effect는 렌더 중 setState라 연쇄 렌더를 만든다.
+   * id를 담아 두면 현재 용의자와 비교만 하면 되므로 동기화할 것이 없다.
+   */
+  const [photoFor, setPhotoFor] = useState<number | null>(null);
+  const photoOpen = photoFor !== null && photoFor === currentSuspectId;
 
   const isNotebook = currentSuspectId === 0;
   const log = chatLogs[currentSuspectId] ?? [];
@@ -183,15 +266,19 @@ export default function InvestigationScreen({
     }
   }, [isTyping, currentSuspectId, remaining]);
 
-  // 서류철을 Escape로 닫는다. 뒤로가기는 usePhaseHistory가 쓰므로 건드리지 않는다.
+  // 겹쳐 뜬 것을 Escape로 닫는다. 위에 있는 것부터 닫힌다.
+  // 뒤로가기는 usePhaseHistory가 게임 내 이동으로 쓰므로 여기서 건드리지 않는다.
   useEffect(() => {
-    if (!fileOpen) return;
+    if (!fileOpen && !photoOpen) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') setFileOpen(false);
+      if (e.key !== 'Escape') return;
+      if (photoOpen) setPhotoFor(null);
+      else setFileOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [fileOpen]);
+  }, [fileOpen, photoOpen]);
+
 
   const inputDisabled = !isNotebook && (remaining <= 0 || isTyping);
   const sendDisabled = !isNotebook && (remaining <= 0 || isTyping || !userInput.trim());
@@ -208,14 +295,14 @@ export default function InvestigationScreen({
         <div className="mx-auto flex w-full max-w-[78rem] items-center gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2">
-              <span className="font-type text-[10px] text-amber-600/70">No.{recordNumber(caseData)}</span>
-              <h2 className="truncate font-dossier text-[15px] font-bold tracking-tight text-amber-200/95 sm:text-base">
+              <span className="font-type text-[0.625rem] text-amber-600/70">No.{recordNumber(caseData)}</span>
+              <h2 className="truncate font-dossier text-[0.9375rem] font-bold tracking-tight text-amber-200/95 sm:text-base">
                 {caseData.title}
               </h2>
             </div>
             <button
               onClick={onGoToBriefing}
-              className="-my-1.5 flex min-h-[44px] items-center text-left text-[11px] text-stone-400/80 underline decoration-stone-600 underline-offset-2 transition-colors hover:text-amber-200"
+              className="-my-1.5 flex min-h-[2.75rem] items-center text-left text-[0.6875rem] text-stone-400/80 underline decoration-stone-600 underline-offset-2 transition-colors hover:text-amber-200"
             >
               사건 브리핑으로
             </button>
@@ -223,7 +310,7 @@ export default function InvestigationScreen({
 
           {/* 남은 시간 — 초과하면 붉게 뛴다 */}
           <div className="shrink-0 text-right">
-            <div className="font-dossier text-[9px] uppercase tracking-[0.2em] text-stone-500">남은 시간</div>
+            <div className="font-dossier text-[0.5625rem] uppercase tracking-[0.2em] text-stone-500">남은 시간</div>
             <div
               className={`font-type text-lg leading-none tabular-nums sm:text-xl ${
                 isOverTime ? 'animate-pulse text-stamp' : 'text-stone-200'
@@ -244,7 +331,7 @@ export default function InvestigationScreen({
           {/* 범인 지목 — 관인을 찍는 행위로 보이게 */}
           <button
             onClick={onGoToDeduction}
-            className="td-stamp flex min-h-[44px] shrink-0 items-center rounded-[2px] bg-paper/95 px-2.5 py-2 font-dossier text-[11px] font-bold leading-tight tracking-[0.16em] transition-transform active:scale-[0.97] sm:px-3.5 sm:text-xs"
+            className="td-stamp flex min-h-[2.75rem] shrink-0 items-center rounded-[2px] bg-paper/95 px-2.5 py-2 font-dossier text-[0.6875rem] font-bold leading-tight tracking-[0.16em] transition-transform active:scale-[0.97] sm:px-3.5 sm:text-xs"
           >
             범인 지목
           </button>
@@ -267,7 +354,7 @@ export default function InvestigationScreen({
           {isOverTime && (
             <div
               aria-hidden="true"
-              className="td-stamp pointer-events-none absolute right-3 top-3 z-20 animate-[td-stamp-in_0.5s_ease-out_both] rounded-[2px] px-2 py-1 font-dossier text-[10px] font-bold tracking-[0.18em] sm:right-6 sm:px-3 sm:text-xs"
+              className="td-stamp pointer-events-none absolute right-3 top-3 z-20 animate-[td-stamp-in_0.5s_ease-out_both] rounded-[2px] px-2 py-1 font-dossier text-[0.625rem] font-bold tracking-[0.18em] sm:right-6 sm:px-3 sm:text-xs"
             >
               시간 초과
             </div>
@@ -277,48 +364,26 @@ export default function InvestigationScreen({
           <div className="relative shrink-0 border-b-[3px] border-double border-ink/25 pb-3 pl-[2.6rem] pr-3 pt-4 sm:pb-4 sm:pl-[3.6rem] sm:pr-6 sm:pt-5">
             <div className="flex items-start gap-3 sm:gap-5">
               {isNotebook ? (
-                <div className="grid h-[76px] w-[60px] shrink-0 place-items-center rounded-[2px] border border-ink/25 bg-paper-2/70 text-ink-faint shadow-inner sm:h-[104px] sm:w-[82px]">
+                <div className="grid h-[4.75rem] w-[3.75rem] shrink-0 place-items-center rounded-[2px] border border-ink/25 bg-paper-2/70 text-ink-faint shadow-inner sm:h-[6.5rem] sm:w-[5.125rem]">
                   <Notebook size={26} strokeWidth={1.4} />
                 </div>
               ) : (
-                /* 클립에 물린 증명사진 */
-                <div className="relative shrink-0 animate-[td-clip-in_0.55s_0.15s_ease-out_both]">
-                  <div className="relative h-[86px] w-[68px] overflow-hidden rounded-[1px] border border-ink/30 bg-ink/10 shadow-[0_3px_10px_rgba(0,0,0,0.4)] sm:h-[118px] sm:w-[94px]">
-                    {currentSuspect?.portraitImage ? (
-                      <Image
-                        src={
-                          currentSuspect.portraitImage.startsWith('http')
-                            ? currentSuspect.portraitImage
-                            : `data:image/jpeg;base64,${currentSuspect.portraitImage}`
-                        }
-                        unoptimized
-                        alt={`${currentSuspect.name} 증명사진`}
-                        fill
-                        className="object-cover contrast-[1.06] saturate-[0.72] sepia-[0.14]"
-                      />
-                    ) : (
-                      <div className="grid h-full w-full place-items-center text-ink-faint">
-                        <User size={30} strokeWidth={1.4} />
-                      </div>
-                    )}
-                    {/* 인화지 광택 */}
-                    <div
-                      aria-hidden="true"
-                      className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/20 mix-blend-overlay"
-                    />
-                  </div>
-                  <Paperclip />
-                </div>
+                /* 클립에 물린 증명사진 — 누르면 원본 크기로 본다 */
+                <MugShot
+                  name={currentSuspect?.name ?? ''}
+                  portrait={currentSuspect?.portraitImage}
+                  onOpen={() => setPhotoFor(currentSuspectId)}
+                />
               )}
 
               <div className="min-w-0 flex-1 pt-0.5">
-                <div className="font-dossier text-[9px] font-bold tracking-[0.34em] text-stamp sm:text-[10px]">
+                <div className="font-dossier text-[0.5625rem] font-bold tracking-[0.34em] text-stamp sm:text-[0.625rem]">
                   {isNotebook ? '수 사 수 첩' : '심 문 조 서'}
                 </div>
-                <h1 className="mt-0.5 truncate font-dossier text-[22px] font-bold leading-tight text-ink sm:text-3xl">
+                <h1 className="mt-0.5 truncate font-dossier text-[1.375rem] font-bold leading-tight text-ink sm:text-3xl">
                   {isNotebook ? '수사 수첩' : currentSuspect?.name}
                 </h1>
-                <p className="mt-1 truncate font-record text-[13px] text-ink-soft sm:text-[14px]">
+                <p className="mt-1 truncate font-record text-[0.8125rem] text-ink-soft sm:text-[0.875rem]">
                   {isNotebook
                     ? '나 혼자 보는 기록. 행동력을 쓰지 않는다.'
                     : [
@@ -329,7 +394,7 @@ export default function InvestigationScreen({
                         .join(' · ')}
                 </p>
 
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-ink/20 pt-2 font-record text-[11px] text-ink-faint sm:text-[12px]">
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-dashed border-ink/20 pt-2 font-record text-[0.6875rem] text-ink-faint sm:text-[0.75rem]">
                   {isNotebook ? (
                     <span>메모 {log.length}건</span>
                   ) : (
@@ -345,7 +410,7 @@ export default function InvestigationScreen({
                   {/* 모바일에서 서류철을 여는 유일한 입구 */}
                   <button
                     onClick={() => setFileOpen(true)}
-                    className="ml-auto -my-2.5 flex min-h-[44px] items-center gap-1 rounded-[2px] border border-ink/25 bg-paper-2/60 px-2 py-1 font-dossier text-[10px] font-bold tracking-wider text-ink-soft transition-colors hover:bg-paper-3/60 lg:hidden"
+                    className="ml-auto -my-2.5 flex min-h-[2.75rem] items-center gap-1 rounded-[2px] border border-ink/25 bg-paper-2/60 px-2 py-1 font-dossier text-[0.625rem] font-bold tracking-wider text-ink-soft transition-colors hover:bg-paper-3/60 lg:hidden"
                   >
                     <FolderOpen size={12} />
                     사건 서류
@@ -368,7 +433,7 @@ export default function InvestigationScreen({
             }`}
           >
             {log.length === 0 && !isTyping && (
-              <p className="py-10 text-center font-record text-[13px] leading-loose text-ink-soft">
+              <p className="py-10 text-center font-record text-[0.8125rem] leading-loose text-ink-soft">
                 {isNotebook ? (
                   <>
                     수첩이 비어 있습니다.
@@ -381,7 +446,7 @@ export default function InvestigationScreen({
                     <br />
                     아래 <span className="font-dossier font-bold text-ink-soft">문</span> 란에 질문을 적으십시오.
                     <br />
-                    <span className="text-[12px]">이 사람에게 {remaining}회 물을 수 있습니다.</span>
+                    <span className="text-[0.75rem]">이 사람에게 {remaining}회 물을 수 있습니다.</span>
                   </>
                 )}
               </p>
@@ -393,7 +458,7 @@ export default function InvestigationScreen({
                 return (
                   <div key={idx} className="my-4 flex animate-fade-in items-center gap-3">
                     <span className="h-px flex-1 bg-ink/15" />
-                    <span className="whitespace-pre-wrap text-center font-dossier text-[10.5px] font-bold uppercase tracking-[0.14em] text-stamp sm:text-[11px]">
+                    <span className="whitespace-pre-wrap text-center font-dossier text-[0.65625rem] font-bold uppercase tracking-[0.14em] text-stamp sm:text-[0.6875rem]">
                       {msg.text}
                     </span>
                     <span className="h-px flex-1 bg-ink/15" />
@@ -405,10 +470,10 @@ export default function InvestigationScreen({
               if (msg.role === 'note') {
                 return (
                   <div key={idx} className="mb-4 flex animate-fade-in gap-2.5">
-                    <span className="mt-[3px] shrink-0 font-type text-[10px] text-pen/75">
+                    <span className="mt-[3px] shrink-0 font-type text-[0.625rem] text-pen/75">
                       {String(idx + 1).padStart(2, '0')}
                     </span>
-                    <p className="flex-1 whitespace-pre-wrap font-record text-[14px] leading-[1.95] text-pen">
+                    <p className="flex-1 whitespace-pre-wrap font-record text-[0.875rem] leading-[1.95] text-pen">
                       {msg.text}
                     </p>
                   </div>
@@ -425,7 +490,7 @@ export default function InvestigationScreen({
                   }`}
                 >
                   <span
-                    className={`select-none pt-[2px] font-dossier text-[15px] font-bold leading-[1.9] sm:text-base ${
+                    className={`select-none pt-[2px] font-dossier text-[0.9375rem] font-bold leading-[1.9] sm:text-base ${
                       isQuestion ? 'text-pen/85' : 'text-stamp/85'
                     }`}
                     aria-hidden="true"
@@ -433,7 +498,7 @@ export default function InvestigationScreen({
                     {isQuestion ? '문' : '답'}
                   </span>
                   <p
-                    className={`whitespace-pre-wrap font-record text-[14px] leading-[1.9] sm:text-[15px] ${
+                    className={`whitespace-pre-wrap font-record text-[0.875rem] leading-[1.9] sm:text-[0.9375rem] ${
                       isQuestion ? 'text-pen' : 'text-ink'
                     }`}
                   >
@@ -447,10 +512,10 @@ export default function InvestigationScreen({
             {/* 타자기가 답변을 찍는 중 */}
             {isTyping && (
               <div className="mt-1.5 grid grid-cols-[1.4rem_1fr] gap-x-2 sm:grid-cols-[1.7rem_1fr] sm:gap-x-2.5">
-                <span aria-hidden="true" className="pt-[2px] font-dossier text-[15px] font-bold leading-[1.9] text-stamp/85 sm:text-base">
+                <span aria-hidden="true" className="pt-[2px] font-dossier text-[0.9375rem] font-bold leading-[1.9] text-stamp/85 sm:text-base">
                   답
                 </span>
-                <p className="td-caret font-record text-[14px] leading-[1.9] text-ink-faint sm:text-[15px]">
+                <p className="td-caret font-record text-[0.875rem] leading-[1.9] text-ink-faint sm:text-[0.9375rem]">
                   <span className="tracking-[0.2em]">진술을 받아 적는 중</span>
                 </p>
               </div>
@@ -464,14 +529,14 @@ export default function InvestigationScreen({
           <div className="flex shrink-0 gap-[3px] overflow-x-auto pt-1.5">
             <button
               onClick={() => setCurrentSuspectId(0)}
-              className={`flex min-h-[44px] min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-t-[3px] px-2 pb-1 pt-1.5 transition-colors ${
+              className={`flex min-h-[2.75rem] min-w-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-t-[3px] px-2 pb-1 pt-1.5 transition-colors ${
                 isNotebook
                   ? 'bg-paper text-ink shadow-[0_-2px_8px_rgba(0,0,0,0.35)]'
                   : 'bg-black/45 text-stone-500 hover:bg-black/30 hover:text-stone-300'
               }`}
             >
               <Notebook size={17} strokeWidth={1.6} />
-              <span className="font-dossier text-[10px] font-bold">수첩</span>
+              <span className="font-dossier text-[0.625rem] font-bold">수첩</span>
             </button>
 
             {caseData.suspects.map((s) => {
@@ -481,7 +546,7 @@ export default function InvestigationScreen({
                 <button
                   key={s.id}
                   onClick={() => setCurrentSuspectId(s.id)}
-                  className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-t-[3px] px-2 pb-1 pt-1.5 transition-colors sm:gap-2 ${
+                  className={`flex min-h-[2.75rem] flex-1 items-center justify-center gap-1.5 rounded-t-[3px] px-2 pb-1 pt-1.5 transition-colors sm:gap-2 ${
                     active
                       ? 'bg-paper text-ink shadow-[0_-2px_8px_rgba(0,0,0,0.35)]'
                       : 'bg-black/45 text-stone-500 hover:bg-black/30 hover:text-stone-300'
@@ -494,11 +559,7 @@ export default function InvestigationScreen({
                   >
                     {s.portraitImage ? (
                       <Image
-                        src={
-                          s.portraitImage.startsWith('http')
-                            ? s.portraitImage
-                            : `data:image/jpeg;base64,${s.portraitImage}`
-                        }
+                        src={portraitSrc(s.portraitImage)}
                         unoptimized
                         alt=""
                         fill
@@ -511,10 +572,10 @@ export default function InvestigationScreen({
                     )}
                   </span>
                   <span className="flex min-w-0 flex-col items-start leading-tight">
-                    <span className="truncate font-dossier text-[11px] font-bold sm:text-xs">{s.name}</span>
+                    <span className="truncate font-dossier text-[0.6875rem] font-bold sm:text-xs">{s.name}</span>
                     {/* 몫이 따로이므로 어디에 여유가 남았는지 탭에서 바로 보여야 한다 */}
                     <span
-                      className={`font-type text-[9px] tabular-nums sm:text-[10px] ${
+                      className={`font-type text-[0.5625rem] tabular-nums sm:text-[0.625rem] ${
                         left === 0
                           ? active ? 'text-stamp' : 'text-stone-600'
                           : active ? 'text-ink-faint' : 'text-stone-600'
@@ -535,7 +596,7 @@ export default function InvestigationScreen({
           <div className="td-paper flex shrink-0 items-center gap-2 rounded-b-[2px] px-2.5 py-2.5 pb-safe sm:gap-3 sm:px-4">
             <span
               aria-hidden="true"
-              className={`shrink-0 font-dossier font-bold ${isNotebook ? 'text-[11px] tracking-widest text-pen/80' : 'text-base text-pen/85'}`}
+              className={`shrink-0 font-dossier font-bold ${isNotebook ? 'text-[0.6875rem] tracking-widest text-pen/80' : 'text-base text-pen/85'}`}
             >
               {isNotebook ? '메모' : '문'}
             </span>
@@ -573,8 +634,8 @@ export default function InvestigationScreen({
         <aside className="hidden w-[19rem] shrink-0 lg:block xl:w-[21rem]">
           <div className="td-paper td-scroll h-full animate-[td-sheet-in_0.45s_0.1s_ease-out_both] overflow-y-auto rounded-[2px] px-5 py-5">
             <div className="mb-4 border-b-[3px] border-double border-ink/25 pb-2.5">
-              <div className="font-dossier text-[9px] font-bold tracking-[0.3em] text-stamp">사 건 서 류</div>
-              <div className="mt-0.5 font-type text-[11px] text-ink-faint">No.{recordNumber(caseData)}</div>
+              <div className="font-dossier text-[0.5625rem] font-bold tracking-[0.3em] text-stamp">사 건 서 류</div>
+              <div className="mt-0.5 font-type text-[0.6875rem] text-ink-faint">No.{recordNumber(caseData)}</div>
             </div>
             <CaseFileRail caseData={caseData} />
           </div>
@@ -592,8 +653,8 @@ export default function InvestigationScreen({
           <div className="td-paper relative max-h-[78dvh] animate-[td-sheet-in_0.32s_ease-out_both] overflow-hidden rounded-t-[4px]">
             <div className="flex items-center justify-between border-b-[3px] border-double border-ink/25 px-4 py-3">
               <div>
-                <div className="font-dossier text-[9px] font-bold tracking-[0.3em] text-stamp">사 건 서 류</div>
-                <div className="mt-0.5 font-type text-[11px] text-ink-faint">No.{recordNumber(caseData)}</div>
+                <div className="font-dossier text-[0.5625rem] font-bold tracking-[0.3em] text-stamp">사 건 서 류</div>
+                <div className="mt-0.5 font-type text-[0.6875rem] text-ink-faint">No.{recordNumber(caseData)}</div>
               </div>
               <button
                 onClick={() => setFileOpen(false)}
@@ -610,6 +671,60 @@ export default function InvestigationScreen({
         </div>
       )}
 
+      {/* ───────── 증명사진 확대 ───────── */}
+      {photoOpen && currentSuspect?.portraitImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+          <button
+            aria-label="사진 닫기"
+            onClick={() => setPhotoFor(null)}
+            className="absolute inset-0 animate-fade-in cursor-zoom-out bg-black/80 backdrop-blur-sm"
+          />
+          {/* 인화지에 붙인 사진 — 사방에 여백을 둔다 */}
+          <figure className="td-paper relative z-10 w-full max-w-[24rem] animate-[td-sheet-in_0.3s_ease-out_both] rounded-[2px] p-3 sm:max-w-[28rem] sm:p-4">
+            {/*
+              조서 안에서는 세로로 잘라 쓰지만 원본은 512x512다.
+              확대에서는 aspect-square로 **자르지 않은 전체**를 보여준다.
+            */}
+            <div className="relative aspect-square w-full overflow-hidden border border-ink/25 bg-ink/10">
+              <Image
+                src={portraitSrc(currentSuspect.portraitImage)}
+                unoptimized
+                alt={`${currentSuspect.name} 증명사진 (확대)`}
+                fill
+                sizes="(min-width: 640px) 28rem, 90vw"
+                className="object-cover contrast-[1.04] saturate-[0.78] sepia-[0.1]"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-black/15 mix-blend-overlay"
+              />
+            </div>
+
+            <figcaption className="px-1 pb-1 pt-3 text-center">
+              <div className="font-dossier text-[0.5625rem] font-bold tracking-[0.34em] text-stamp">
+                심 문 조 서 · 인 물 사 진
+              </div>
+              <div className="mt-1 font-dossier text-xl font-bold leading-tight text-ink">
+                {currentSuspect.name}
+              </div>
+              <div className="mt-1 font-record text-[0.8125rem] text-ink-soft">
+                {[currentSuspect.role, currentSuspect.age ? `${currentSuspect.age}세` : null]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+            </figcaption>
+
+            <button
+              onClick={() => setPhotoFor(null)}
+              aria-label="닫기"
+              className="td-stamp absolute -right-2 -top-2 grid h-11 w-11 place-items-center rounded-full bg-paper sm:-right-3 sm:-top-3"
+            >
+              <X size={17} />
+            </button>
+          </figure>
+        </div>
+      )}
+
       {/* ───────── 시간 초과 통보 ───────── */}
       {showTimeOverModal && (
         <div className="absolute inset-0 z-50 flex animate-fade-in items-center justify-center bg-black/55 p-5 backdrop-blur-sm">
@@ -622,17 +737,17 @@ export default function InvestigationScreen({
             <div className="space-y-5 px-5 py-5 text-ink">
               <div>
                 <h3 className="mb-2 font-dossier text-sm font-bold text-stamp">골든 타임 종료</h3>
-                <p className="font-record text-[13.5px] leading-[1.9] text-ink-soft">
+                <p className="font-record text-[0.84375rem] leading-[1.9] text-ink-soft">
                   <span className="font-bold text-ink underline decoration-ink/40">제한 시간 20분</span>이 모두
                   경과했습니다. 현장에 경찰 병력이 도착하여 통제를 시작했습니다.
                 </p>
               </div>
 
               <div className="border-l-[3px] border-stamp/50 bg-stamp/[0.06] px-3.5 py-3">
-                <h3 className="mb-1.5 font-dossier text-[10px] font-bold uppercase tracking-[0.2em] text-stamp">
+                <h3 className="mb-1.5 font-dossier text-[0.625rem] font-bold uppercase tracking-[0.2em] text-stamp">
                   본부 지침
                 </h3>
-                <p className="font-record text-[13.5px] leading-[1.9] text-ink">
+                <p className="font-record text-[0.84375rem] leading-[1.9] text-ink">
                   수사는 계속할 수 있으나, 최종 평가 등급은{' '}
                   <span className="font-bold text-stamp underline decoration-stamp/50">최대 B등급</span>으로
                   제한됩니다.
@@ -643,7 +758,7 @@ export default function InvestigationScreen({
             <div className="border-t border-ink/15 bg-paper-2/70 p-4">
               <button
                 onClick={closeTimeOverModal}
-                className="td-stamp min-h-[48px] w-full rounded-[2px] bg-paper/60 font-dossier text-sm font-bold tracking-[0.18em] transition-transform active:scale-[0.98]"
+                className="td-stamp min-h-[3rem] w-full rounded-[2px] bg-paper/60 font-dossier text-sm font-bold tracking-[0.18em] transition-transform active:scale-[0.98]"
               >
                 수신 확인
               </button>

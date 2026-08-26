@@ -47,13 +47,13 @@ export default function ConfirmModal({
         <div className="p-4 bg-[#e6dbc5] border-t border-[#d6cbb5] flex gap-2">
           <button
             onClick={onCancel}
-            className="flex-[2] min-h-[48px] bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-sm shadow-md transition-colors flex items-center justify-center gap-2"
+            className="flex-[2] min-h-[3rem] bg-gray-800 hover:bg-gray-700 text-white font-bold rounded-sm shadow-md transition-colors flex items-center justify-center gap-2"
           >
             <X size={16} /> 계속하기
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 min-h-[48px] bg-transparent hover:bg-black/5 text-red-800 font-bold rounded-sm border border-red-800/40 transition-colors text-sm"
+            className="flex-1 min-h-[3rem] bg-transparent hover:bg-black/5 text-red-800 font-bold rounded-sm border border-red-800/40 transition-colors text-sm"
           >
             {confirmLabel}
           </button>

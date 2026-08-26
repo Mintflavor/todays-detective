@@ -68,7 +68,7 @@ export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }
       </div>
       
       {/* Copyright Footer */}
-      <footer className="absolute bottom-4 w-full text-center text-[10px] text-gray-500/50 font-mono z-10">
+      <footer className="absolute bottom-4 w-full text-center text-[0.625rem] text-gray-500/50 font-mono z-10">
         <p>&copy; 2025-2026 Hyunil Park. All Rights Reserved.</p>
       </footer>
     </div>

@@ -97,7 +97,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
         {/* Header */}
         <div className="text-center border-b border-gray-700/50 pb-6">
           <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">수사 결과 보고서</h2>
-          <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
+          <p className="text-gray-400 text-[0.625rem] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -130,7 +130,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
             </div>
             
             {/* Caption */}
-            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100 min-h-[40px]">
+            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100 min-h-[2.5rem]">
               진범: {showTruth ? evaluation.culpritName : '???'}
             </div>
             <div className="flex justify-between px-2 pt-2 font-mono text-xs text-gray-500">
@@ -382,7 +382,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
                       rows={6}
                       className="w-full bg-black/40 border border-gray-700 focus:border-amber-700 focus:outline-none text-gray-200 text-sm p-3 rounded-sm resize-none font-serif placeholder-gray-600"
                     />
-                    <div className="absolute bottom-2 right-3 text-[10px] font-mono text-gray-500">
+                    <div className="absolute bottom-2 right-3 text-[0.625rem] font-mono text-gray-500">
                       {feedbackText.length} / {FEEDBACK_MAX_LENGTH}
                     </div>
                   </div>
