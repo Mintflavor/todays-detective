@@ -17,6 +17,7 @@ import InvestigationScreen from './components/InvestigationScreen';
 import DeductionScreen from './components/DeductionScreen';
 import ResolutionScreen from './components/ResolutionScreen';
 import ErrorModal from './components/ErrorModal';
+import ConfirmModal from './components/ConfirmModal';
 import AdminScreen from './components/AdminScreen';
 import AdminAuthModal from './components/AdminAuthModal';
 import { useSecretCommand } from './hooks/useSecretCommand';
@@ -39,6 +40,7 @@ export default function TodaysDetective() {
     isMuted, toggleMute,
     showTimeOverModal, closeTimeOverModal,
     gameError, dismissError,
+    quitPrompt, confirmQuit, cancelQuit,
     audioRef,
     timerSeconds, isOverTime,
 
@@ -92,6 +94,16 @@ export default function TodaysDetective() {
         onRetry={gameError?.retry}
         onSecondary={gameError?.secondary?.action}
         secondaryLabel={gameError?.secondary?.label}
+      />
+
+      {/* 뒤로가기로 진행 중인 수사를 버릴 때만 뜬다 */}
+      <ConfirmModal
+        open={quitPrompt}
+        title="수사 중단"
+        message="처음 화면으로 돌아가면 지금까지의 심문 기록과 남은 시간이 사라집니다. 사건 자체는 기록실에 남습니다."
+        confirmLabel="중단하고 나가기"
+        onConfirm={confirmQuit}
+        onCancel={cancelQuit}
       />
 
       {/* Background Audio */}
