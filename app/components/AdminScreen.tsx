@@ -262,6 +262,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             setCurrentSuspectId={setMockCurrentSuspectId}
             chatLogs={mockChatLogs}
             actionPoints={5}
+            totalActionPoints={20}
             timerSeconds={600}
             isOverTime={false}
             showTimeOverModal={false}
@@ -284,8 +285,12 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             caseData={testCaseData} 
             deductionInput={mockDeductionInput} 
             setDeductionInput={setMockDeductionInput} 
-            onSubmit={() => alert("Submit Deduction")} 
-            onBack={() => setTestScreen('NONE')} 
+            onSubmit={() => alert("Submit Deduction")}
+            onBack={() => setTestScreen('NONE')}
+            timerSeconds={600}
+            isOverTime={false}
+            actionPoints={5}
+            totalActionPoints={20}
           />
         ) : null;
       case 'RESOLUTION':
@@ -303,7 +308,8 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
               culpritImage: testCaseData.suspects[0]?.portraitImage,
               caseNumber: "TEST-001"
             }} 
-            onReset={() => setTestScreen('NONE')} 
+            onReset={() => setTestScreen('NONE')}
+            onGoToArchive={() => setTestScreen('NONE')} 
           />
         ) : null;
       default:

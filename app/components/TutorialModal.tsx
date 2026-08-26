@@ -41,10 +41,10 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
             <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">질문 팁</h3>
             <div className="space-y-2 text-sm">
               <div className="flex gap-2 text-red-700/70">
-                <X size={16} /> "너 범인이야?" (단순 부정만)
+                <X size={16} /> &ldquo;너 범인이야?&rdquo; (단순 부정만)
               </div>
               <div className="flex gap-2 text-green-800">
-                <CheckCircle size={16} /> "8시 정전 때 어디에 있었나?"
+                <CheckCircle size={16} /> &ldquo;8시 정전 때 어디에 있었나?&rdquo;
               </div>
             </div>
           </div>

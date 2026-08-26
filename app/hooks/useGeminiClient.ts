@@ -4,137 +4,139 @@
 // Author: Hyunil Park
 // Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
 
-import { useState } from 'react';
-import { API_BASE, errorMessage } from '../lib/http';
+/**
+ * 백엔드 게임 API 호출 계층.
+ *
+ * **이 계층은 에러 상태를 갖지 않는다.** 실패하면 `ApiError`를 던지고 끝이다.
+ * 무엇을 보여주고 무엇으로 재시도할지는 호출부(useGameEngine)가 결정한다.
+ *
+ * 과거에는 이 파일이 errorMsg와 retryAction을 직접 들고 있었는데,
+ * 재시도 콜백으로 `generateCase` **자기 자신**을 등록하는 바람에
+ * 재시도가 성공해도 그 결과를 받는 곳이 없었다. 사건 생성은 1회 약 159원이므로
+ * "돈은 나가고 화면은 그대로"가 됐다. 상태 소유권을 호출부로 옮겨 구조적으로 막는다.
+ */
+
+import { API_BASE, ApiError, errorMessage, readJson } from '../lib/http';
 import { CaseData, Evaluation } from '../types/game';
 
-interface UseGeminiClientReturn {
-  errorMsg: string | null;
-  setErrorMsg: (msg: string | null) => void;
-  retryAction: (() => void) | null;
-  setRetryAction: (action: (() => void) | null) => void;
-  generateCase: () => Promise<CaseData>;
-  interrogateSuspect: (scenarioId: string, suspectId: number, history: string, userMsg: string) => Promise<string>;
-  evaluateDeduction: (scenarioId: string, culpritName: string, reasoning: string, isOverTime: boolean) => Promise<Evaluation>;
+/**
+ * 사건 생성 상한 타임아웃.
+ *
+ * 실측 25~31초다. NPM·Next는 300초까지 기다리므로 그대로 두면 무한정 로딩만 돈다.
+ * 넉넉하게 잡되 반드시 끝나게 한다. 중단해도 서버 작업은 계속되며 시나리오는
+ * 저장되므로, 타임아웃 시에는 기록실을 안내한다 (호출부 참조).
+ */
+const CASE_TIMEOUT_MS = 120_000;
+
+/** 응답을 검사해 실패면 ApiError를 던진다. */
+async function ensureOk(response: Response, fallback: string): Promise<unknown> {
+  const data = await readJson(response);
+  if (!response.ok) {
+    throw new ApiError(response.status, errorMessage(data, fallback));
+  }
+  return data;
 }
 
-export default function useGeminiClient(): UseGeminiClientReturn {
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
+async function generateCase(): Promise<CaseData> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CASE_TIMEOUT_MS);
 
-  const withErrorHandling = async <T>(action: () => Promise<T>, failMessage: string, retryCallback: () => void): Promise<T> => {
-    try {
-      setErrorMsg(null);
-      setRetryAction(null);
-      return await action();
-    } catch (e) {
-      console.error("Gemini Client Error:", e);
-      if (e instanceof Error) {
-         console.error("Error Message:", e.message);
-         console.error("Stack Trace:", e.stack);
-      }
-      setErrorMsg(failMessage);
-      setRetryAction(() => retryCallback);
-      throw e; // Re-throw to propagate the error to the caller
+  let data: unknown;
+  try {
+    const response = await fetch(`${API_BASE}/api/game/start`, {
+      method: 'POST',
+      signal: controller.signal,
+    });
+    data = await ensureOk(response, '사건 파일을 불러오는데 실패했습니다.');
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new ApiError(0, '사건 생성이 너무 오래 걸립니다.');
     }
+    throw new ApiError(0, '서버에 연결할 수 없습니다.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const body = data as { caseData?: CaseData; scenarioId?: string };
+  if (!body?.caseData) {
+    throw new ApiError(500, '사건 파일이 손상되었습니다.');
+  }
+  return { ...body.caseData, scenarioId: body.scenarioId } as CaseData;
+}
+
+async function interrogateSuspect(
+  scenarioId: string,
+  suspectId: number,
+  history: string,
+  userMsg: string
+): Promise<string> {
+  let data: unknown;
+  try {
+    const response = await fetch(`${API_BASE}/api/game/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scenarioId, suspectId, message: userMsg, history }),
+    });
+    data = await ensureOk(response, '용의자와의 통신이 불안정합니다.');
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(0, '서버에 연결할 수 없습니다.');
+  }
+  return (data as { reply: string }).reply;
+}
+
+async function evaluateDeduction(
+  scenarioId: string,
+  culpritName: string,
+  reasoning: string,
+  isOverTime: boolean
+): Promise<Evaluation> {
+  let data: unknown;
+  try {
+    const response = await fetch(`${API_BASE}/api/game/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenarioId,
+        deductionData: { culpritName, reasoning, isOverTime },
+      }),
+    });
+    data = await ensureOk(response, '추리 평가 중 오류가 발생했습니다.');
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    throw new ApiError(0, '서버에 연결할 수 없습니다.');
+  }
+
+  const d = data as Omit<Evaluation, 'timeTaken'>;
+  return {
+    isCorrect: d.isCorrect,
+    report: d.report,
+    advice: d.advice,
+    grade: d.grade,
+    truth: d.truth,
+    culpritName: d.culpritName,
+    timeTaken: '',
   };
+}
 
-  const generateCase = async (): Promise<CaseData> => {
-    return withErrorHandling(async () => {
-      const response = await fetch(`${API_BASE}/api/game/start`, {
-        method: 'POST',
-      });
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(errorMessage(data, "Failed to generate case"));
-      }
-
-      if (data && data.caseData) {
-        // Attach scenarioId to caseData
-        return {
-          ...data.caseData,
-          scenarioId: data.scenarioId
-        } as CaseData;
-      } else {
-        throw new Error("Invalid Case Data Structure");
-      }
-    }, "사건 파일을 불러오는데 실패했습니다.", generateCase);
-  };
-
-  const interrogateSuspect = async (
+interface UseGeminiClientReturn {
+  generateCase: () => Promise<CaseData>;
+  interrogateSuspect: (
     scenarioId: string,
     suspectId: number,
     history: string,
     userMsg: string
-  ): Promise<string> => {
-    return withErrorHandling(async () => {
-      const response = await fetch(`${API_BASE}/api/game/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenarioId,
-          suspectId,
-          message: userMsg,
-          history
-        }),
-      });
-      
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(errorMessage(data, "Failed to interrogate suspect"));
-      }
-
-      return data.reply;
-    }, "용의자와의 통신이 불안정합니다. 다시 시도해주세요.", () => interrogateSuspect(scenarioId, suspectId, history, userMsg));
-  };
-
-  const evaluateDeduction = async (
+  ) => Promise<string>;
+  evaluateDeduction: (
     scenarioId: string,
-    culpritName: string, // Player's choice
+    culpritName: string,
     reasoning: string,
     isOverTime: boolean
-  ): Promise<Evaluation> => {
-    return withErrorHandling(async () => {
-      const response = await fetch(`${API_BASE}/api/game/evaluate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          scenarioId,
-          deductionData: {
-            culpritName,
-            reasoning,
-            isOverTime
-          }
-        }),
-      });
+  ) => Promise<Evaluation>;
+}
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(errorMessage(data, "Failed to evaluate deduction"));
-      }
-
-      return {
-        isCorrect: data.isCorrect,
-        report: data.report,
-        advice: data.advice,
-        grade: data.grade,
-        truth: data.truth,
-        culpritName: data.culpritName,
-        timeTaken: "" 
-      };
-    }, "추리 평가 중 오류가 발생했습니다.", () => evaluateDeduction(scenarioId, culpritName, reasoning, isOverTime));
-  };
-
-  return {
-    errorMsg,
-    setErrorMsg,
-    retryAction,
-    setRetryAction,
-    generateCase,
-    interrogateSuspect,
-    evaluateDeduction
-  };
+// 모듈 수준 함수라 참조가 안정적이다 — useCallback 의존성 배열이 매 렌더 깨지지 않는다.
+export default function useGeminiClient(): UseGeminiClientReturn {
+  return { generateCase, interrogateSuspect, evaluateDeduction };
 }

@@ -38,7 +38,7 @@ https://detective.mintflavor.ddns.net (이미지는 `cdn.mintflavor.ddns.net`).
 ├── server/                 # FastAPI 백엔드
 │   ├── app/                # config, db, gemini, storage, sanitize, models, auth, ratelimit
 │   │   └── routers/        # game, scenarios, feedbacks, admin
-│   ├── tests/              # pytest 179건
+│   ├── tests/              # pytest 217건
 │   └── Dockerfile          # 멀티스테이지 (기본 runtime, --target test)
 ├── infra/                  # Docker Compose 스택 + 운영 스크립트
 └── plan/                   # 설계·이전 계획 문서
@@ -157,7 +157,38 @@ api 컨테이너로 넘긴다 → CORS가 발생하지 않고 `NEXT_PUBLIC_*` �
 **4. `case_data`를 엄격한 스키마로 만들지 말 것.**
 LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정상 시나리오까지 422로 튕긴다.
 
-**5. 사건 생성은 25~31초 걸린다.**
+**5. 프롬프트의 스키마 예시는 그대로 결과에 복사된다.**
+[server/app/prompts.py](server/app/prompts.py)의 `CASE_SCHEMA_BODY`에 특정 값을 박아두면
+**모든 사건이 그 값으로 나온다.** 실제로 예시가 `id 2`에 `isCulprit: true`를 박아둔 탓에
+운영 데이터의 범인이 4/4 전부 id 2였다 — 기록 재생 시 수사 없이 정답을 아는 상태였다.
+같은 이유로 `crime_type`은 살인 4/4, 증거는 3개 4/4로 고정됐다.
+
+세 용의자 슬롯의 설명은 **완전히 대칭이어야 한다.** 한 슬롯에만 "거짓 알리바이"처럼
+다른 문구가 있으면 그것이 범인 힌트로 복사된다. `tests/test_prompt_diversity.py`가
+대칭성과 `isCulprit` 예시가 boolean인지를 검증한다.
+
+무작위성은 LLM에 맡기지 않고 `build_case_spec()`이 서버에서 뽑아 주입한다.
+"각 유형 20%"처럼 프롬프트로 부탁하면 따르지 않는다.
+생성 4회 실측으로 주입이 반영되는 것을 확인했다 (구 프롬프트는 범인이 4/4 id 2였는데
+신 프롬프트에서는 id 1이 2회 나왔다). 결과는 `scenarios.generation_audit`에
+불리언으로 남는다 — **지정 범인 id는 저장하지 않는다. 그 자체가 정답 노출이다.**
+
+`isCulprit`에 설명 문자열을 넣지 말 것. `find_culprit()`이 truthiness로 판정하므로
+`"false"`가 True가 되어 엉뚱한 인물이 범인이 된다. 저장 직전
+`_normalize_culprit()`이 방어하지만 애초에 boolean 예시를 쓰는 것이 맞다.
+
+**6. 프론트엔드 에러 상태는 `useGameEngine`이 소유한다.**
+[app/hooks/useGeminiClient.ts](app/hooks/useGeminiClient.ts)는 `ApiError`만 던지고
+에러 상태를 갖지 않는다. 과거에 API 계층이 재시도 콜백까지 들고 있었고 그 콜백이
+`generateCase` 자기 자신이라, 재시도가 성공해도 결과를 받는 곳이 없었다 —
+159원을 쓰고 화면은 그대로였다. 재시도 콜백은 **상태를 반영하는 쪽**에 두어야 한다.
+
+429는 반드시 별도 분기한다. 리밋이 `2/hour;3/day;25/month`라 429는 예외가 아니라
+정상 동작이며, 재시도가 무의미하므로 기록실로 유도해야 한다.
+`ErrorModal`에는 **항상 닫기가 있어야 한다** — 예전에 버튼이 재시도 하나뿐이라
+실패한 플레이어가 취할 수 있는 유일한 행동이 유료 API 재호출이었다.
+
+**7. 사건 생성은 25~31초 걸린다.**
 타임아웃이 3곳에 있다 — NPM(`proxy_read_timeout`), Next(`experimental.proxyTimeout`, 기본 30초),
 api. Next 기본값 때문에 성공 응답이 500이 된 적이 있다 (계획 §4-A).
 
