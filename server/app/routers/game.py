@@ -123,23 +123,25 @@ def _coerce_bool(value: object) -> bool:
     return bool(value)
 
 
-def _normalize_culprit(case_data: dict[str, Any], expected_id: int) -> None:
+def _normalize_culprit(case_data: dict[str, Any], expected_id: int) -> bool:
     """isCulprit을 boolean으로 정규화하고 정확히 1명만 남긴다. 제자리 수정.
 
     범인이 0명이면 find_culprit()이 None을 반환하고, 평가 프롬프트의 정답이
     "Unknown"이 되어 **모든 추리가 조용히 틀리게 채점된다.** 예외가 나지 않으므로
     반드시 여기서 막는다.
+
+    교정이 발동했으면 True를 반환한다 (감사용).
     """
     suspects = [s for s in case_data.get("suspects") or [] if isinstance(s, dict)]
     if not suspects:
-        return
+        return False
 
     for s in suspects:
         s["isCulprit"] = _coerce_bool(s.get("isCulprit"))
 
     culprits = [s for s in suspects if s["isCulprit"]]
     if len(culprits) == 1:
-        return
+        return False
 
     # 지정한 id를 우선 쓰고, 없으면 첫 번째 인물로 떨어뜨린다.
     target = next((s for s in suspects if s.get("id") == expected_id), suspects[0])
@@ -152,6 +154,7 @@ def _normalize_culprit(case_data: dict[str, Any], expected_id: int) -> None:
     )
     for s in suspects:
         s["isCulprit"] = s is target
+    return True
 
 
 @router.post("/start", response_model=GameStartResponse)
@@ -188,12 +191,24 @@ def start_case(request: Request) -> GameStartResponse:
         spec.evidence_count,
         spec.stage,
     )
-    _normalize_culprit(case_data, spec.culprit_id)
+    culprit_was_normalized = _normalize_culprit(case_data, spec.culprit_id)
 
     actual_culprit = next(
         (s for s in suspects if isinstance(s, dict) and s.get("isCulprit")), None
     )
     actual_culprit_id = (actual_culprit or {}).get("id")
+
+    # 감사 결과는 **불리언만** 남긴다. 지정 범인 id를 저장하면 그 자체가 스포일러다.
+    # 컨테이너를 재생성하면 stdout 로그는 사라지므로 DB에 남겨야 사후 확인이 된다
+    # (실제로 검증 직후 재시작해서 로그를 날린 적이 있다).
+    generation_audit = {
+        "culprit_followed": actual_culprit_id == spec.culprit_id,
+        "crime_type_followed": case_data.get("crime_type") == spec.crime_type,
+        "evidence_count_followed": len(case_data.get("evidence_list") or [])
+        == spec.evidence_count,
+        "culprit_normalized": culprit_was_normalized,
+    }
+
     if actual_culprit_id != spec.culprit_id:
         # 교정 대상이 아니다 (범인은 정확히 1명이다). LLM이 다른 인물을 골랐을 뿐이며
         # 서사는 그 인물 기준으로 일관되므로 덮어쓰지 않는다. 다만 빈도는 봐야 한다.
@@ -224,6 +239,7 @@ def start_case(request: Request) -> GameStartResponse:
             "summary": case_data.get("summary", ""),
             "crime_type": case_data.get("crime_type") or "Unknown",
             "case_data": case_data,
+            "generation_audit": generation_audit,
             "created_at": now,
         }
     )

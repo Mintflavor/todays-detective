@@ -264,3 +264,64 @@ class TestCulpritNormalization:
         case = {"suspects": ["쓰레기", {"id": 1, "name": "가", "isCulprit": False}]}
         _normalize_culprit(case, expected_id=1)
         assert case["suspects"][1]["isCulprit"] is True
+
+
+class TestNormalizeReturnsWhetherItActed:
+    """감사 결과에 "교정이 발동했는지"를 남기려면 반환값이 정확해야 한다.
+
+    이 값이 없으면 "프롬프트가 지켰다"와 "안전망이 고쳤다"를 구별할 수 없다.
+    """
+
+    @staticmethod
+    def _case(*flags):
+        return {"suspects": [{"id": i + 1, "name": "가", "isCulprit": v}
+                             for i, v in enumerate(flags)]}
+
+    def test_returns_false_when_already_valid(self):
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit(self._case(False, True, False), 2) is False
+
+    def test_returns_false_even_when_culprit_differs_from_designated(self):
+        """1명이면 서사를 존중해 손대지 않으므로 교정이 아니다."""
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit(self._case(True, False, False), 3) is False
+
+    def test_returns_true_when_no_culprit(self):
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit(self._case(False, False, False), 2) is True
+
+    def test_returns_true_when_multiple_culprits(self):
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit(self._case(True, True, False), 1) is True
+
+    def test_returns_true_when_string_values_needed_coercion_and_left_none(self):
+        """문자열 "false"만 있으면 boolean 변환 후 범인이 0명이 되어 교정된다."""
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit(self._case("false", "false", "false"), 2) is True
+
+    def test_returns_false_for_empty_suspects(self):
+        from app.routers.game import _normalize_culprit
+
+        assert _normalize_culprit({"suspects": []}, 1) is False
+
+
+class TestAuditIsSpoilerFree:
+    """감사 결과에 지정 범인 id를 담으면 그 자체가 정답 노출이다."""
+
+    def test_audit_keys_are_booleans_only(self):
+        import inspect
+
+        from app.routers.game import start_case
+
+        src = inspect.getsource(start_case)
+        # generation_audit 리터럴에 spec.culprit_id가 값으로 들어가면 안 된다.
+        block = src.split("generation_audit = {", 1)[1].split("}", 1)[0]
+        assert "spec.culprit_id" not in block.replace("== spec.culprit_id", ""), (
+            "감사 결과에 지정 범인 id가 저장되고 있다 — 스포일러다"
+        )
+        assert "actual_culprit_id," not in block

@@ -402,10 +402,10 @@ iOS Safari는 16px 미만 입력에 포커스하면 페이지를 자동 확대�
 
 | 항목 | 값 |
 |---|---|
-| pytest | **179 → 210건** (프롬프트 다양성·범인 교정 31건 추가) |
+| pytest | **179 → 217건** (프롬프트 다양성·범인 교정·감사 38건 추가) |
 | `npm run lint` | 오류 0 (경고 7건은 기존) |
 | `npm run build` | 성공. 정적 라우트 `/`·`/_not-found` 2개 유지 |
-| Gemini 유료 호출 | **1회 (약 159원)** — §14 검증에만 사용 |
+| Gemini 유료 호출 | **4회 (약 636원)** — §14 검증에만 사용 |
 
 ## ⚠️ 첫 수정은 실제로 고쳐지지 않았다
 
@@ -459,7 +459,95 @@ mv $B/.env.bak $B/.env && chmod 600 $B/.env && docker compose up -d todays-detec
 | 추리 화면 시간·AP | 없음 | `09:45` / `20 / 20` / "시간이 흐르지 않습니다" |
 | 추리 textarea | 12px, 128px, `resize:none` | **16px, 180px, `resize:vertical`** |
 
-## §14 유료 검증 — 1회 생성 (159원)
+## §14 유료 검증 — 총 4회 생성 (약 636원)
+
+1회로 시작해 3회를 추가했다. 신 프롬프트 4건과 구 프롬프트 4건을 나란히 놓으면
+효과가 분명하다.
+
+| | 구 프롬프트 4건 | 신 프롬프트 4건 |
+|---|---|---|
+| `crime_type` | **살인 4/4** | 절도·살인·절도·방화 (**살인 1/4**) |
+| 범인 id | **2, 2, 2, 2** | **2, 2, 1, 1** |
+| 증거 개수 | **3, 3, 3, 3** | 2, 3, 3, 2 |
+| 무대 | 안개/비 저택·산장 4/4 | 상가·연구실·경매장·연구실 (**저택 0/4**) |
+| 조건 | 폭우·안개·해무로 고립 | 한파+단수, 벚꽃 인파, 벚꽃 인파, 첫눈 |
+| `isCulprit` 타입 | boolean | boolean |
+| 정화본 누출 | — | 0건 |
+
+신 프롬프트 4건의 제목:
+
+```
+동파된 상가의 얼어붙은 탐욕      절도  증거 2  범인 id 2
+흩날리는 벚꽃과 냉동고의 침묵    살인  증거 3  범인 id 2
+새벽 경매장의 붉은 인어          절도  증거 3  범인 id 1
+첫눈이 내린 연구실의 화염        방화  증거 2  범인 id 1
+```
+
+### 범인 위치 지정이 실제로 먹는다
+
+구 프롬프트에서는 **id 1이 단 한 번도 나오지 않았다.** 신 프롬프트에서 id 1이
+2회 나왔다는 것은 서버가 주입한 지정이 결과에 반영된다는 뜻이다.
+
+정밀도는 아직 모른다. id 3은 4건 중 나오지 않았지만, 균등 추출이라면
+4회 안에 3이 안 나올 확률이 (2/3)^4 ≈ 20%라 이상한 값이 아니다.
+
+### 무대·조건이 주입 풀에서 나왔다
+
+4건 모두 `STAGES`·`CONDITIONS`에 있는 항목을 그대로 썼다. 저택·산장·폭우·안개는
+하나도 없다. 다만 **풀이 작아 반복이 보인다** — 4건 중 연구실이 2회, 벚꽃 조건이
+2회다. `STAGES` 24종 / `CONDITIONS` 14종에 월 25판이면 생일 문제로 중복이 흔하다.
+풀을 키우거나 최근 사용 이력을 피하는 로직이 필요하다.
+
+## ⚠️ 내가 유료 검증 로그를 날렸다
+
+3회 생성 직후 `.env`를 원복하고 `docker compose up -d`를 돌렸다. 환경변수가 바뀌어
+**컨테이너가 재생성되면서 방금 477원으로 만든 `지정 조건` 로그가 사라졌다.**
+
+그래서 이 3건에 대해 **"프롬프트가 지켰다"와 "안전망(`_normalize_culprit`)이 고쳤다"를
+구별할 수 없다.** 게임 무결성은 확인됐다(4건 모두 범인 정확히 1명, boolean) —
+어느 쪽이든 결과는 정상이다. 다만 프롬프트의 실효성은 이 3건으로 판정할 수 없다.
+
+**대응**: 감사 결과를 DB에 남기게 했다. `scenarios.generation_audit`:
+
+```
+culprit_followed          지정 범인 id와 결과가 일치했는지
+crime_type_followed       지정 범죄 유형을 지켰는지
+evidence_count_followed   지정 증거 개수를 지켰는지
+culprit_normalized        안전망이 발동했는지
+```
+
+**불리언만 저장한다.** 지정 범인 id를 저장하면 그 자체가 정답 노출이다.
+`tests/test_prompt_diversity.py::TestAuditIsSpoilerFree`가 이를 고정한다.
+`GET /scenarios` 목록은 `ScenarioListItem`이 추가 키를 버리므로 새지 않는다.
+
+이제 컨테이너를 재시작해도 사후 확인이 된다:
+
+```bash
+ssh unraid 'B=/mnt/user/appdata/todays-detective/compose; U=$(grep -m1 "^MONGODB_URL=" $B/.env | cut -d= -f2-);
+docker exec todays-detective-mongo mongosh "$U" --quiet --eval "
+db.scenarios.find({generation_audit: {\$exists: true}}, {generation_audit:1, title:1}).forEach(printjson)"'
+```
+
+**교훈**: 로그는 컨테이너 수명에 묶인다. 유료로 만든 관측값을 stdout에만 두면
+재시작 한 번에 사라진다. 되돌릴 수 없는 비용으로 얻은 데이터는 영속 저장소에 남긴다.
+그리고 **검증 데이터를 읽기 전에 환경을 원복하지 않는다.**
+
+## 참고 — 리밋을 넘겨 검증한 절차
+
+리밋이 `2/hour;3/day`라 3회 연속 생성이 불가능하다. 테스트 창에서만 시·일 한도를
+완화하고 **월 상한 25는 그대로 뒀다** (예산 방어선 유지).
+
+```bash
+B=/mnt/user/appdata/todays-detective/compose
+cp $B/.env $B/.env.bak
+sed -i "s|^RATE_LIMIT_START_GLOBAL=.*|RATE_LIMIT_START_GLOBAL=5/hour;6/day;25/month|" $B/.env
+cd $B && docker compose up -d todays-detective-api
+# ... 생성 3회 ...
+# ⚠️ 여기서 로그를 먼저 읽는다. 원복하면 컨테이너가 재생성돼 로그가 사라진다.
+mv $B/.env.bak $B/.env && chmod 600 $B/.env && docker compose up -d todays-detective-api
+```
+
+## 이전 기록 — 1회차 상세 (159원)
 
 `scenarioId=6a8dc574bcfc6f8b5af6438d`, 35.8초, HTTP 200.
 
@@ -476,14 +564,13 @@ mv $B/.env.bak $B/.env && chmod 600 $B/.env && docker compose up -d todays-detec
 
 즉 LLM이 주입된 지정 조건을 그대로 따랐다.
 
-### 이 표본으로 판정할 수 없었던 것
+### 1회차 시점에 판정할 수 없었던 것
 
-범인이 `id 2`로 나왔는데, **지정 id가 2였는지 LLM이 지정을 무시하고 2를 골랐는지
-구별할 수 없었다** — 당시 로그에 지정값이 없었다. 사전확률 1/3이라 1개 표본으로는
-결론이 나지 않는다.
+범인이 `id 2`로 나왔는데, 당시 로그에 지정값이 없어 **지정 id가 2였는지 LLM이
+지정을 무시하고 2를 골랐는지 구별할 수 없었다.** 이후 3회를 추가해 id 1이 2회
+나온 것으로 지정이 반영된다는 것을 확인했다 (위 §범인 위치 지정 참조).
 
-그래서 매 생성의 지정값과 실제 범인 위치를 로그에 남기게 했다. 앞으로는 플레이만
-해도 자동으로 검증된다:
+매 생성의 지정값을 로그와 DB에 남기므로 앞으로는 플레이만 해도 검증된다:
 
 ```bash
 ssh unraid 'docker logs todays-detective-api --since 24h 2>&1 | grep -e "지정 조건" -e 불일치 -e 교정'
@@ -497,5 +584,7 @@ ssh unraid 'docker logs todays-detective-api --since 24h 2>&1 | grep -e "지정 
 
 - 진행 중 게임의 `sessionStorage` 저장 — 지금도 새로고침하면 심문 기록이 사라진다.
   §3에서 제안했으나 상태 직렬화 범위가 커서 별도 작업으로 남겼다
+- **무대·조건 풀 확대 또는 최근 사용 회피** — 4건 중 연구실 2회, 벚꽃 2회가 겹쳤다.
+  현재 `STAGES` 24종 / `CONDITIONS` 14종인데 월 25판이면 중복이 흔하다
 - 기록실 검색·총 개수 표시
 - `AdminScreen`의 `exhaustive-deps` 경고 5건 (동작 변경 위험이 있어 손대지 않았다)
