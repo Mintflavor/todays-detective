@@ -38,7 +38,7 @@ https://detective.mintflavor.ddns.net (이미지는 `cdn.mintflavor.ddns.net`).
 ├── server/                 # FastAPI 백엔드
 │   ├── app/                # config, db, gemini, storage, sanitize, models, auth, ratelimit
 │   │   └── routers/        # game, scenarios, feedbacks, admin
-│   ├── tests/              # pytest 217건
+│   ├── tests/              # pytest 223건
 │   └── Dockerfile          # 멀티스테이지 (기본 runtime, --target test)
 ├── infra/                  # Docker Compose 스택 + 운영 스크립트
 └── plan/                   # 설계·이전 계획 문서

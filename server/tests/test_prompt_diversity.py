@@ -144,16 +144,39 @@ class TestEvidenceCount:
 
 class TestStageVariety:
     def test_pools_are_large_enough(self):
-        """풀이 작으면 몇 판 만에 같은 무대가 반복된다. 월 25판이 상한이다."""
-        assert len(STAGES) >= 20, "무대 풀이 %d개뿐이다" % len(STAGES)
-        assert len(CONDITIONS) >= 10
-        assert len(TIME_FRAMES) >= 4
+        """풀이 작으면 몇 판 만에 같은 무대가 반복된다. 월 25판이 상한이다.
 
-    def test_pools_avoid_the_cliche(self):
-        """풀 자체에 저택·산장이 있으면 금지 지시와 모순된다."""
+        24종이던 시절 실측에서 4건 중 연구실이 2회 겹쳤다. 생일 문제로
+        25회 추출 시 전부 다를 확률이 사실상 0이었다.
+        """
+        assert len(STAGES) >= 60, "무대 풀이 %d개뿐이다" % len(STAGES)
+        assert len(CONDITIONS) >= 30, "조건 풀이 %d개뿐이다" % len(CONDITIONS)
+        assert len(TIME_FRAMES) >= 8
+
+    @pytest.mark.parametrize("name", ["STAGES", "CONDITIONS", "TIME_FRAMES"])
+    def test_no_duplicates(self, name):
+        """손으로 쓴 긴 목록이라 중복이 들어가기 쉽다. 중복은 그 항목의 확률만 올린다."""
+        from app import prompts
+
+        pool = getattr(prompts, name)
+        dupes = [x for x in set(pool) if pool.count(x) > 1]
+        assert not dupes, "%s에 중복이 있다: %s" % (name, dupes)
+
+    def test_combination_space_covers_monthly_volume(self):
+        """무대만으로는 겹쳐도 (무대 x 조건 x 시간대) 조합이 충분해야 장면이 반복되지 않는다."""
+        combos = len(STAGES) * len(CONDITIONS) * len(TIME_FRAMES)
+        assert combos >= 10_000, "조합이 %d개뿐이다 — 월 25판 x 12개월을 감당하지 못한다" % combos
+
+    @pytest.mark.parametrize("pool_name", ["STAGES", "CONDITIONS"])
+    def test_pools_avoid_the_cliche(self, pool_name):
+        """풀 자체에 저택·산장이 있으면 프롬프트의 금지 지시와 모순된다."""
+        from app import prompts
+
         banned = ("저택", "산장", "별장", "펜션")
-        for stage in STAGES:
-            assert not any(b in stage for b in banned), "무대 풀에 클리셰가 있다: %s" % stage
+        for item in getattr(prompts, pool_name):
+            assert not any(b in item for b in banned), (
+                "%s에 클리셰가 있다: %s" % (pool_name, item)
+            )
 
     def test_conditions_are_not_all_isolation_weather(self):
         """날씨를 고립 장치로만 쓰면 결국 같은 사건이 된다."""
@@ -163,8 +186,17 @@ class TestStageVariety:
         )
 
     def test_stage_varies_across_samples(self, prompts):
+        """300회 추출이면 풀의 대부분이 등장해야 한다 (일부만 뽑히는 버그 감지)."""
         stages = Counter(_field(p, "- 무대:") for p in prompts)
-        assert len(stages) >= 15, "%d종류의 무대만 등장했다" % len(stages)
+        assert len(stages) >= len(STAGES) * 0.8, (
+            "%d/%d 종류의 무대만 등장했다" % (len(stages), len(STAGES))
+        )
+
+    def test_condition_varies_across_samples(self, prompts):
+        conditions = Counter(_field(p, "- 당시 조건:") for p in prompts)
+        assert len(conditions) >= len(CONDITIONS) * 0.8, (
+            "%d/%d 종류의 조건만 등장했다" % (len(conditions), len(CONDITIONS))
+        )
 
 
 class TestCulpritNormalization:
