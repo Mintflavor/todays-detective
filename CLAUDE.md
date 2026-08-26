@@ -38,7 +38,7 @@ https://detective.mintflavor.ddns.net (이미지는 `cdn.mintflavor.ddns.net`).
 ├── server/                 # FastAPI 백엔드
 │   ├── app/                # config, db, gemini, storage, sanitize, models, auth, ratelimit
 │   │   └── routers/        # game, scenarios, feedbacks, admin
-│   ├── tests/              # pytest 223건
+│   ├── tests/              # pytest 239건
 │   └── Dockerfile          # 멀티스테이지 (기본 runtime, --target test)
 ├── infra/                  # Docker Compose 스택 + 운영 스크립트
 └── plan/                   # 설계·이전 계획 문서
@@ -170,8 +170,14 @@ LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정�
 무작위성은 LLM에 맡기지 않고 `build_case_spec()`이 서버에서 뽑아 주입한다.
 "각 유형 20%"처럼 프롬프트로 부탁하면 따르지 않는다.
 생성 4회 실측으로 주입이 반영되는 것을 확인했다 (구 프롬프트는 범인이 4/4 id 2였는데
-신 프롬프트에서는 id 1이 2회 나왔다). 결과는 `scenarios.generation_audit`에
-불리언으로 남는다 — **지정 범인 id는 저장하지 않는다. 그 자체가 정답 노출이다.**
+신 프롬프트에서는 id 1이 2회 나왔다).
+
+선택값과 감사 결과는 `scenarios.generation_spec`·`generation_audit`에 남는다.
+**`culprit_id`와 `prompt`는 절대 저장하지 않는다** — 범인 id는 정답이고 프롬프트에는
+그 id가 적혀 있다. `CaseSpec.storable()`이 걸러 주므로 dict를 직접 만들지 말 것.
+
+무대·조건은 최근 20판/10판을 피해서 고른다. 이 회피는 **최적화이지 필수 경로가
+아니다** — DB 조회 실패나 후보 소진 시 전체 풀로 되돌아간다. 생성을 막지 않는다.
 
 `isCulprit`에 설명 문자열을 넣지 말 것. `find_culprit()`이 truthiness로 판정하므로
 `"false"`가 True가 되어 엉뚱한 인물이 범인이 된다. 저장 직전

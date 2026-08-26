@@ -357,3 +357,88 @@ class TestAuditIsSpoilerFree:
             "감사 결과에 지정 범인 id가 저장되고 있다 — 스포일러다"
         )
         assert "actual_culprit_id," not in block
+
+
+class TestStorableIsSpoilerFree:
+    """저장 대상에 범인 id가 들어가면 그 자체가 정답 노출이다."""
+
+    def test_culprit_id_is_absent(self):
+        from app.prompts import build_case_spec
+
+        spec = build_case_spec(random.Random(1))
+        stored = spec.storable()
+        assert "culprit_id" not in stored
+        assert spec.culprit_id not in stored.values(), (
+            "범인 id가 값으로 새어 들어갔다: %r" % stored
+        )
+
+    def test_prompt_is_absent(self):
+        """프롬프트 본문에는 지정 범인 id가 적혀 있다. 저장하면 정답이 남는다."""
+        from app.prompts import build_case_spec
+
+        spec = build_case_spec(random.Random(2))
+        stored = spec.storable()
+        assert "prompt" not in stored
+        for v in stored.values():
+            assert "isCulprit" not in str(v)
+
+    def test_only_player_visible_fields(self):
+        """플레이어가 브리핑에서 이미 보는 정보만 저장한다."""
+        from app.prompts import build_case_spec
+
+        stored = build_case_spec(random.Random(3)).storable()
+        assert set(stored) == {
+            "stage",
+            "condition",
+            "time_frame",
+            "crime_type",
+            "evidence_count",
+        }
+
+
+class TestRecentAvoidance:
+    """풀을 키워도 생일 문제로 중복이 남는다. 최근 사용분을 피해야 0이 된다."""
+
+    def test_avoids_recent_stage(self):
+        from app.prompts import STAGES, build_case_spec
+
+        recent = set(STAGES[:70])
+        for seed in range(30):
+            spec = build_case_spec(random.Random(seed), recent_stages=recent)
+            assert spec.stage not in recent, "회피 대상 무대가 뽑혔다: %s" % spec.stage
+
+    def test_avoids_recent_condition(self):
+        from app.prompts import CONDITIONS, build_case_spec
+
+        recent = set(CONDITIONS[:30])
+        for seed in range(30):
+            spec = build_case_spec(random.Random(seed), recent_conditions=recent)
+            assert spec.condition not in recent
+
+    def test_falls_back_when_everything_excluded(self):
+        """제외하면 남는 게 없을 때 생성을 막으면 안 된다. 겹치는 편이 낫다."""
+        from app.prompts import CONDITIONS, STAGES, build_case_spec
+
+        spec = build_case_spec(
+            random.Random(1), recent_stages=set(STAGES), recent_conditions=set(CONDITIONS)
+        )
+        assert spec.stage in STAGES
+        assert spec.condition in CONDITIONS
+
+    def test_no_repeat_within_window(self):
+        """창 크기만큼 연속 생성해도 무대가 겹치지 않아야 한다."""
+        from app.prompts import build_case_spec
+
+        r = random.Random(99)
+        window: list[str] = []
+        for _ in range(20):
+            spec = build_case_spec(r, recent_stages=set(window))
+            assert spec.stage not in window, "창 안에서 무대가 반복됐다: %s" % spec.stage
+            window.append(spec.stage)
+        assert len(set(window)) == 20
+
+    def test_empty_recent_uses_full_pool(self):
+        from app.prompts import STAGES, build_case_spec
+
+        seen = {build_case_spec(random.Random(s)).stage for s in range(200)}
+        assert len(seen) > len(STAGES) * 0.5, "회피 인자 없이도 풀 전체를 써야 한다"

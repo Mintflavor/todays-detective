@@ -5,6 +5,7 @@
 # Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
 
 import random
+from collections.abc import Collection
 from dataclasses import dataclass
 
 # ─────────────────────────── 다양성 축 ───────────────────────────
@@ -186,17 +187,57 @@ class CaseSpec:
     evidence_count: int
     prompt: str
 
+    def storable(self) -> dict[str, object]:
+        """DB에 남겨도 되는 필드만 골라 준다.
 
-def build_case_spec(rng: random.Random | None = None) -> CaseSpec:
+        **`culprit_id`와 `prompt`는 절대 포함하지 않는다.** 범인 id는 정답 그 자체이고,
+        프롬프트에는 그 id가 적혀 있다. 무대·조건·시간대·범죄 유형·증거 개수는
+        플레이어가 브리핑에서 이미 보는 정보이므로 저장해도 스포일러가 아니다.
+
+        저장 목적은 두 가지다 — 최근 사용 회피(중복 무대 방지)와 사후 감사.
+        """
+        return {
+            "stage": self.stage,
+            "condition": self.condition,
+            "time_frame": self.time_frame,
+            "crime_type": self.crime_type,
+            "evidence_count": self.evidence_count,
+        }
+
+
+def _pick_avoiding(
+    r: random.Random | object, pool: tuple[str, ...], recent: Collection[str]
+) -> str:
+    """최근에 쓴 항목을 뺀 나머지에서 고른다.
+
+    풀을 키워도 생일 문제로 중복이 남는다 (78종에 월 25판이면 3~4회).
+    최근 사용분을 제외하면 그 창 안에서는 중복이 0이 된다.
+
+    제외하면 남는 것이 없을 때는 **전체 풀로 되돌린다.** 사건 생성을 막는 것보다
+    무대가 겹치는 편이 낫다.
+    """
+    fresh = [x for x in pool if x not in recent]
+    return r.choice(fresh or list(pool))  # type: ignore[union-attr]
+
+
+def build_case_spec(
+    rng: random.Random | None = None,
+    *,
+    recent_stages: Collection[str] = (),
+    recent_conditions: Collection[str] = (),
+) -> CaseSpec:
     """사건 생성 조건을 뽑고 프롬프트까지 만든다.
+
+    `recent_*`에 최근 사용분을 넘기면 그 항목을 피해서 고른다. 비워두면 전체 풀에서
+    고른다 — 이 함수는 DB를 모른다. 최근 이력 조회는 호출부(라우터)의 책임이다.
 
     `rng`를 넘기면 결정적으로 동작한다 (테스트용).
     """
     r = rng or random
     values = {
         "crime_type": r.choice(CRIME_TYPES),
-        "stage": r.choice(STAGES),
-        "condition": r.choice(CONDITIONS),
+        "stage": _pick_avoiding(r, STAGES, recent_stages),
+        "condition": _pick_avoiding(r, CONDITIONS, recent_conditions),
         "time_frame": r.choice(TIME_FRAMES),
         "culprit_id": r.randint(1, 3),
         "evidence_count": r.randint(2, 4),
