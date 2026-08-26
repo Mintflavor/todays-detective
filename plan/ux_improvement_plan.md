@@ -663,8 +663,53 @@ phase마다 `pushState`를 하면 히스토리가 깊어지고, 게임을 나온
   회피는 **최적화이지 필수 경로가 아니다.** DB 조회가 실패하면 빈 집합을 반환해
   전체 풀에서 고른다 — DB 문제로 159원짜리 생성을 막을 이유가 없다.
   제외 후 남는 항목이 없을 때도 전체 풀로 되돌린다.
-- **프론트엔드 테스트 하니스가 없다** — `backTargetFor` 같은 순수 함수는 단위
-  테스트가 쉬운데 jest/vitest 설정이 없어 브라우저 실측으로만 검증했다.
-  `usePhaseHistory`의 분기가 늘어나면 하니스를 도입할 값이 있다
+- ~~프론트엔드 테스트 하니스가 없다~~ — **사실과 달랐다.** vitest·jsdom·
+  testing-library가 이미 `devDependencies`에 있고 `npm test` 스크립트도 있었다.
+  없던 것은 `vitest.config.ts`와 테스트 파일뿐이어서 `npx vitest run`이
+  "No test files found"로 끝났을 뿐이다. `package.json`을 확인하지 않고
+  테스트 파일이 없는 것만 보고 단정했다. 지금은 설정을 만들고 **50건**을 붙였다
+  (§16 참조).
 - 기록실 검색·총 개수 표시
 - `AdminScreen`의 `exhaustive-deps` 경고 5건 (동작 변경 위험이 있어 손대지 않았다)
+
+
+---
+
+# §16. 프론트엔드 테스트 (2026-08-26)
+
+`vitest.config.ts` + `vitest.setup.ts`를 만들고 `tests/frontend/`에 **50건**을 붙였다.
+API 계층을 목으로 대체하므로 **Gemini 비용이 없다.**
+
+테스트를 `app/` 밖에 두는 이유: `app/`은 App Router의 라우팅 디렉터리다. 테스트를
+그 안에 두면 라우팅 규칙과 섞여 판단할 거리가 늘어난다. `server/tests/`와 대칭을 맞췄다.
+`npm run build` 결과가 여전히 정적 라우트 2개(`/`, `/_not-found`)인 것으로 확인했다.
+
+| 파일 | 대상 |
+|---|---|
+| `usePhaseHistory.test.ts` | 뒤로가기 분기 7개, 감시용 엔트리 관리 |
+| `useGameEngine.test.ts` | 취소된 생성 무효화, 실패 복구, 셔플, 동적 대화 로그, 튜토리얼 조건 |
+| `utils.test.ts` | `shuffled` 분포·불변성, `formatTime` |
+| `http.test.ts` | `ApiError` 분류(429/중단), `errorMessage` 폴백 |
+
+## 계약으로 고정한 것
+
+브라우저 실측은 "지금 되더라"만 보여준다. 아래는 깨지면 결과가 나쁜 것들이라
+단정으로 남겼다:
+
+- `backTargetFor('intro')`는 반드시 `exit` — 막으면 **사이트에서 나갈 길이 없다**
+- 진행 중인 phase(`briefing`·`investigation`·`deduction`·`loading`)에서 `reset`으로
+  바로 가는 경로가 **하나도 없어야** 한다 — 키 한 번에 10분치 수사가 사라진다
+- 화면이 네 번 바뀌어도 `pushState`는 **1회** — 엔트리를 쌓으면 게임을 나온 뒤
+  뒤로가기가 여러 번 먹통이 된다
+- 취소 후 도착한 생성 결과는 `caseData`에 반영되지 않는다
+- 실패 오류에 기록실로 가는 대안 경로가 있다 — 유일한 행동이 유료 재호출이면 안 된다
+
+## 테스트가 잡은 것
+
+`vitest.setup.ts`에 `cleanup()`을 넣지 않았을 때, 앞선 테스트의 훅이 계속 살아 있어
+`window`의 `popstate` 리스너가 전부 응답했다. `pushState` 호출이 1회가 아니라
+**5회**로 집계되며 5건이 실패했다.
+
+훅이 `window`에 리스너를 붙이는 구조라면 테스트 간 언마운트가 필수다. 서버 쪽에서
+`conftest`의 격리 장치가 오히려 검증 대상을 우회시킨 적이 있었는데(§5-C), 이번은
+반대로 **격리가 없어서** 테스트끼리 오염된 경우다. 두 방향 모두 확인해야 한다.

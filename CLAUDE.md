@@ -35,6 +35,7 @@ https://detective.mintflavor.ddns.net (이미지는 `cdn.mintflavor.ddns.net`).
 │   ├── lib/                # http.ts, api.ts, adminAuth.ts, utils.ts
 │   ├── types/game.ts
 │   └── page.tsx            # 페이즈 라우팅
+├── tests/frontend/         # vitest 50건 (훅·순수 함수)
 ├── server/                 # FastAPI 백엔드
 │   ├── app/                # config, db, gemini, storage, sanitize, models, auth, ratelimit
 │   │   └── routers/        # game, scenarios, feedbacks, admin
@@ -64,7 +65,12 @@ git show $(git rev-list -1 HEAD -- lambda/handler.py):lambda/handler.py
 npm run dev          # 개발 서버 (3000)
 npm run build        # output:'standalone' 프로덕션 빌드
 npm run lint         # ESLint (next build는 lint를 돌리지 않는다)
+npm test             # vitest — tests/frontend/ (50건). Gemini 호출 없음
 ```
+
+> 프론트엔드 테스트는 `app/` 밖의 `tests/frontend/`에 둔다. `app/`은 App Router의
+> 라우팅 디렉터리라 테스트 파일을 섞으면 판단할 거리가 늘어난다 (`server/tests/`와 대칭).
+> API 계층(`useGeminiClient`)을 목으로 대체하므로 비용이 발생하지 않는다.
 
 > 로컬 `npm run dev`로 백엔드를 쓰려면 `API_INTERNAL_URL`을 실행 중인 api 주소로 지정한다.
 > 기본값은 컨테이너명 `http://todays-detective-api:8000`이라 호스트에서는 해석되지 않는다.
