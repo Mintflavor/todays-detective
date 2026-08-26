@@ -541,7 +541,6 @@ export default function InvestigationScreen({
 
             {caseData.suspects.map((s) => {
               const active = currentSuspectId === s.id;
-              const left = actionPoints[s.id] ?? 0;
               return (
                 <button
                   key={s.id}
@@ -571,19 +570,7 @@ export default function InvestigationScreen({
                       </span>
                     )}
                   </span>
-                  <span className="flex min-w-0 flex-col items-start leading-tight">
-                    <span className="truncate font-dossier text-[0.6875rem] font-bold sm:text-xs">{s.name}</span>
-                    {/* 몫이 따로이므로 어디에 여유가 남았는지 탭에서 바로 보여야 한다 */}
-                    <span
-                      className={`font-type text-[0.5625rem] tabular-nums sm:text-[0.625rem] ${
-                        left === 0
-                          ? active ? 'text-stamp' : 'text-stone-600'
-                          : active ? 'text-ink-faint' : 'text-stone-600'
-                      }`}
-                    >
-                      {left === 0 ? '소진' : `${left}회`}
-                    </span>
-                  </span>
+                  <span className="truncate font-dossier text-[0.6875rem] font-bold sm:text-xs">{s.name}</span>
                 </button>
               );
             })}
