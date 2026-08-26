@@ -11,6 +11,7 @@ import { ApiError } from '../lib/http';
 
 import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
+import usePhaseHistory from './usePhaseHistory';
 
 const INITIAL_AP = 20;
 const TOTAL_SECONDS = 600;
@@ -65,6 +66,14 @@ export default function useGameEngine() {
   // gameError로 판단하면 사용자가 모달을 닫는 순간 실패한 사실이 사라지고,
   // 튜토리얼을 마쳤을 때 로딩 화면으로 들어가 갇힌다 (실제로 그렇게 갇혔다).
   const [caseFetchFailed, setCaseFetchFailed] = useState(false);
+  // 뒤로가기로 수사를 버릴 때 확인을 받는다.
+  const [quitPrompt, setQuitPrompt] = useState(false);
+
+  // 진행 중인 생성을 무효화하는 세대 번호.
+  // 취소하고 인트로로 나온 뒤에 생성이 완료되면 setPreloadedData가 실행되어
+  // **낡은 사건이 되살아난다.** 그 상태에서 "새로운 의뢰"를 누르면 새 생성(159원)을
+  // 또 걸면서 화면에는 옛 사건이 뜬다. 세대가 어긋난 결과는 버린다.
+  const generationEpoch = useRef(0);
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
@@ -209,12 +218,15 @@ export default function useGameEngine() {
   const fetchCaseRef = useRef<() => void>(() => {});
 
   const fetchCase = useCallback(async () => {
+    const epoch = ++generationEpoch.current;
     setGameError(null);
     setCaseFetchFailed(false);
     try {
       const data = await generateCase();
+      if (epoch !== generationEpoch.current) return;  // 취소된 생성 — 결과를 버린다
       setPreloadedData(data);
     } catch (err) {
+      if (epoch !== generationEpoch.current) return;
       setCaseFetchFailed(true);
       console.error("Case generation failed:", err);
       // 로딩 화면에 갇히지 않도록 반드시 흐름을 되돌린다.
@@ -376,6 +388,8 @@ export default function useGameEngine() {
 
   /** 전체 초기화. 과거에는 window.location.reload()로 자산까지 다시 받았다. */
   const resetGame = useCallback(() => {
+    generationEpoch.current += 1;   // 진행 중인 생성 결과를 무효화한다
+    setQuitPrompt(false);
     setCaseData(null);
     setPreloadedData(null);
     setEvaluation(null);
@@ -408,6 +422,20 @@ export default function useGameEngine() {
     }
   }, [finalizeGameStart]);
 
+  usePhaseHistory({
+    phase,
+    goToPhase: setPhase,
+    reset: resetGame,
+    askQuit: () => setQuitPrompt(true),
+  });
+
+  const confirmQuit = useCallback(() => {
+    setQuitPrompt(false);
+    resetGame();
+  }, [resetGame]);
+
+  const cancelQuit = useCallback(() => setQuitPrompt(false), []);
+
   const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setUserInput(e.target.value);
   }, []);
@@ -438,6 +466,7 @@ export default function useGameEngine() {
     isMuted, toggleMute,
     showTimeOverModal, closeTimeOverModal, triggerTimeOver: () => setShowTimeOverModal(true),
     gameError, dismissError,
+    quitPrompt, confirmQuit, cancelQuit,
     audioRef,
     timerSeconds, isOverTime,
 

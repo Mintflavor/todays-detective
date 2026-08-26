@@ -144,16 +144,39 @@ class TestEvidenceCount:
 
 class TestStageVariety:
     def test_pools_are_large_enough(self):
-        """풀이 작으면 몇 판 만에 같은 무대가 반복된다. 월 25판이 상한이다."""
-        assert len(STAGES) >= 20, "무대 풀이 %d개뿐이다" % len(STAGES)
-        assert len(CONDITIONS) >= 10
-        assert len(TIME_FRAMES) >= 4
+        """풀이 작으면 몇 판 만에 같은 무대가 반복된다. 월 25판이 상한이다.
 
-    def test_pools_avoid_the_cliche(self):
-        """풀 자체에 저택·산장이 있으면 금지 지시와 모순된다."""
+        24종이던 시절 실측에서 4건 중 연구실이 2회 겹쳤다. 생일 문제로
+        25회 추출 시 전부 다를 확률이 사실상 0이었다.
+        """
+        assert len(STAGES) >= 60, "무대 풀이 %d개뿐이다" % len(STAGES)
+        assert len(CONDITIONS) >= 30, "조건 풀이 %d개뿐이다" % len(CONDITIONS)
+        assert len(TIME_FRAMES) >= 8
+
+    @pytest.mark.parametrize("name", ["STAGES", "CONDITIONS", "TIME_FRAMES"])
+    def test_no_duplicates(self, name):
+        """손으로 쓴 긴 목록이라 중복이 들어가기 쉽다. 중복은 그 항목의 확률만 올린다."""
+        from app import prompts
+
+        pool = getattr(prompts, name)
+        dupes = [x for x in set(pool) if pool.count(x) > 1]
+        assert not dupes, "%s에 중복이 있다: %s" % (name, dupes)
+
+    def test_combination_space_covers_monthly_volume(self):
+        """무대만으로는 겹쳐도 (무대 x 조건 x 시간대) 조합이 충분해야 장면이 반복되지 않는다."""
+        combos = len(STAGES) * len(CONDITIONS) * len(TIME_FRAMES)
+        assert combos >= 10_000, "조합이 %d개뿐이다 — 월 25판 x 12개월을 감당하지 못한다" % combos
+
+    @pytest.mark.parametrize("pool_name", ["STAGES", "CONDITIONS"])
+    def test_pools_avoid_the_cliche(self, pool_name):
+        """풀 자체에 저택·산장이 있으면 프롬프트의 금지 지시와 모순된다."""
+        from app import prompts
+
         banned = ("저택", "산장", "별장", "펜션")
-        for stage in STAGES:
-            assert not any(b in stage for b in banned), "무대 풀에 클리셰가 있다: %s" % stage
+        for item in getattr(prompts, pool_name):
+            assert not any(b in item for b in banned), (
+                "%s에 클리셰가 있다: %s" % (pool_name, item)
+            )
 
     def test_conditions_are_not_all_isolation_weather(self):
         """날씨를 고립 장치로만 쓰면 결국 같은 사건이 된다."""
@@ -163,8 +186,17 @@ class TestStageVariety:
         )
 
     def test_stage_varies_across_samples(self, prompts):
+        """300회 추출이면 풀의 대부분이 등장해야 한다 (일부만 뽑히는 버그 감지)."""
         stages = Counter(_field(p, "- 무대:") for p in prompts)
-        assert len(stages) >= 15, "%d종류의 무대만 등장했다" % len(stages)
+        assert len(stages) >= len(STAGES) * 0.8, (
+            "%d/%d 종류의 무대만 등장했다" % (len(stages), len(STAGES))
+        )
+
+    def test_condition_varies_across_samples(self, prompts):
+        conditions = Counter(_field(p, "- 당시 조건:") for p in prompts)
+        assert len(conditions) >= len(CONDITIONS) * 0.8, (
+            "%d/%d 종류의 조건만 등장했다" % (len(conditions), len(CONDITIONS))
+        )
 
 
 class TestCulpritNormalization:
@@ -325,3 +357,88 @@ class TestAuditIsSpoilerFree:
             "감사 결과에 지정 범인 id가 저장되고 있다 — 스포일러다"
         )
         assert "actual_culprit_id," not in block
+
+
+class TestStorableIsSpoilerFree:
+    """저장 대상에 범인 id가 들어가면 그 자체가 정답 노출이다."""
+
+    def test_culprit_id_is_absent(self):
+        from app.prompts import build_case_spec
+
+        spec = build_case_spec(random.Random(1))
+        stored = spec.storable()
+        assert "culprit_id" not in stored
+        assert spec.culprit_id not in stored.values(), (
+            "범인 id가 값으로 새어 들어갔다: %r" % stored
+        )
+
+    def test_prompt_is_absent(self):
+        """프롬프트 본문에는 지정 범인 id가 적혀 있다. 저장하면 정답이 남는다."""
+        from app.prompts import build_case_spec
+
+        spec = build_case_spec(random.Random(2))
+        stored = spec.storable()
+        assert "prompt" not in stored
+        for v in stored.values():
+            assert "isCulprit" not in str(v)
+
+    def test_only_player_visible_fields(self):
+        """플레이어가 브리핑에서 이미 보는 정보만 저장한다."""
+        from app.prompts import build_case_spec
+
+        stored = build_case_spec(random.Random(3)).storable()
+        assert set(stored) == {
+            "stage",
+            "condition",
+            "time_frame",
+            "crime_type",
+            "evidence_count",
+        }
+
+
+class TestRecentAvoidance:
+    """풀을 키워도 생일 문제로 중복이 남는다. 최근 사용분을 피해야 0이 된다."""
+
+    def test_avoids_recent_stage(self):
+        from app.prompts import STAGES, build_case_spec
+
+        recent = set(STAGES[:70])
+        for seed in range(30):
+            spec = build_case_spec(random.Random(seed), recent_stages=recent)
+            assert spec.stage not in recent, "회피 대상 무대가 뽑혔다: %s" % spec.stage
+
+    def test_avoids_recent_condition(self):
+        from app.prompts import CONDITIONS, build_case_spec
+
+        recent = set(CONDITIONS[:30])
+        for seed in range(30):
+            spec = build_case_spec(random.Random(seed), recent_conditions=recent)
+            assert spec.condition not in recent
+
+    def test_falls_back_when_everything_excluded(self):
+        """제외하면 남는 게 없을 때 생성을 막으면 안 된다. 겹치는 편이 낫다."""
+        from app.prompts import CONDITIONS, STAGES, build_case_spec
+
+        spec = build_case_spec(
+            random.Random(1), recent_stages=set(STAGES), recent_conditions=set(CONDITIONS)
+        )
+        assert spec.stage in STAGES
+        assert spec.condition in CONDITIONS
+
+    def test_no_repeat_within_window(self):
+        """창 크기만큼 연속 생성해도 무대가 겹치지 않아야 한다."""
+        from app.prompts import build_case_spec
+
+        r = random.Random(99)
+        window: list[str] = []
+        for _ in range(20):
+            spec = build_case_spec(r, recent_stages=set(window))
+            assert spec.stage not in window, "창 안에서 무대가 반복됐다: %s" % spec.stage
+            window.append(spec.stage)
+        assert len(set(window)) == 20
+
+    def test_empty_recent_uses_full_pool(self):
+        from app.prompts import STAGES, build_case_spec
+
+        seen = {build_case_spec(random.Random(s)).stage for s in range(200)}
+        assert len(seen) > len(STAGES) * 0.5, "회피 인자 없이도 풀 전체를 써야 한다"

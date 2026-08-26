@@ -56,6 +56,59 @@ class TestStart:
 
         monkeypatch.setattr(storage, "upload_portrait", fake_upload)
 
+    def test_stores_generation_spec_without_culprit_id(self, client, test_db):
+        """저장 경로 전체를 무료로 검증한다 (Gemini는 목).
+
+        generation_spec은 최근 사용 회피와 사후 감사에 쓴다. 여기에 범인 id가
+        들어가면 그 자체가 정답 노출이므로 필드 집합을 고정한다.
+        """
+        from bson import ObjectId
+
+        sid = client.post("/api/game/start").json()["scenarioId"]
+        doc = test_db["scenarios"].find_one({"_id": ObjectId(sid)})
+
+        spec = doc["generation_spec"]
+        assert set(spec) == {
+            "stage", "condition", "time_frame", "crime_type", "evidence_count",
+        }, "저장 필드가 바뀌었다: %s" % sorted(spec)
+        assert "culprit_id" not in spec
+        assert "prompt" not in spec
+        # 값에도 범인 id가 섞이지 않아야 한다.
+        real_culprit = next(
+            s["id"] for s in doc["case_data"]["suspects"] if s.get("isCulprit")
+        )
+        assert real_culprit not in spec.values()
+
+    def test_stores_generation_audit(self, client, test_db):
+        """감사 결과가 없으면 프롬프트 준수와 안전망 개입을 구별할 수 없다."""
+        from bson import ObjectId
+
+        sid = client.post("/api/game/start").json()["scenarioId"]
+        doc = test_db["scenarios"].find_one({"_id": ObjectId(sid)})
+
+        audit = doc["generation_audit"]
+        assert set(audit) == {
+            "culprit_followed",
+            "crime_type_followed",
+            "evidence_count_followed",
+            "culprit_normalized",
+        }
+        assert all(isinstance(v, bool) for v in audit.values()), (
+            "감사 결과는 불리언이어야 한다 (id 등 값이 새면 스포일러): %r" % audit
+        )
+
+    def test_avoids_recently_used_stage(self, client, test_db):
+        """직전 생성의 무대를 다시 쓰지 않아야 한다."""
+        from bson import ObjectId
+
+        test_db["scenarios"].delete_many({})
+        stages = []
+        for _ in range(3):
+            sid = client.post("/api/game/start").json()["scenarioId"]
+            doc = test_db["scenarios"].find_one({"_id": ObjectId(sid)})
+            stages.append(doc["generation_spec"]["stage"])
+        assert len(set(stages)) == 3, "회피가 동작하지 않았다: %s" % stages
+
     def test_returns_scenario_id_and_case(self, client):
         r = client.post("/api/game/start")
         assert r.status_code == 200
@@ -390,3 +443,73 @@ class TestFeedbacksCrud:
         second = client.post("/feedbacks", json={"content": "두번째"}).json()["_id"]
         items = client.get("/feedbacks", headers=admin_headers).json()
         assert [i["_id"] for i in items][:2] == [second, first]
+
+
+class TestRecentChoicesFromDb:
+    """최근 사용 회피는 DB 이력을 읽는다. 실패해도 생성을 막지 않아야 한다."""
+
+    def test_reads_recent_specs(self, test_db):
+        from datetime import datetime, timezone
+
+        from app.routers.game import _recent_choices
+
+        test_db["scenarios"].delete_many({})
+        for i in range(3):
+            test_db["scenarios"].insert_one({
+                "generation_spec": {"stage": "무대%d" % i, "condition": "조건%d" % i},
+                "created_at": datetime(2026, 8, 26, 12, i, tzinfo=timezone.utc),
+            })
+        stages, conditions = _recent_choices()
+        assert stages == {"무대0", "무대1", "무대2"}
+        assert conditions == {"조건0", "조건1", "조건2"}
+
+    def test_ignores_docs_without_spec(self, test_db):
+        """구 데이터에는 generation_spec이 없다. 그것 때문에 깨지면 안 된다."""
+        from datetime import datetime, timezone
+
+        from app.routers.game import _recent_choices
+
+        test_db["scenarios"].delete_many({})
+        test_db["scenarios"].insert_one({
+            "title": "구 데이터", "created_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
+        })
+        test_db["scenarios"].insert_one({
+            "generation_spec": {"stage": "무대A", "condition": "조건A"},
+            "created_at": datetime(2026, 8, 26, tzinfo=timezone.utc),
+        })
+        stages, conditions = _recent_choices()
+        assert stages == {"무대A"}
+        assert conditions == {"조건A"}
+
+    def test_empty_collection_returns_empty_sets(self, test_db):
+        from app.routers.game import _recent_choices
+
+        test_db["scenarios"].delete_many({})
+        assert _recent_choices() == (set(), set())
+
+    def test_db_failure_does_not_raise(self, test_db, monkeypatch):
+        """DB 문제로 159원짜리 생성을 막을 이유가 없다."""
+        from app import db as db_module
+        from app.routers.game import _recent_choices
+
+        def _boom():
+            raise RuntimeError("mongo down")
+
+        monkeypatch.setattr(db_module, "get_scenarios", _boom)
+        assert _recent_choices() == (set(), set())
+
+    def test_malformed_spec_is_skipped(self, test_db):
+        """case_data처럼 generation_spec도 형태를 신뢰할 수 없다."""
+        from datetime import datetime, timezone
+
+        from app.routers.game import _recent_choices
+
+        test_db["scenarios"].delete_many({})
+        for i, spec in enumerate([{"stage": None}, {"stage": ""}, "문자열", {"stage": 123}]):
+            test_db["scenarios"].insert_one({
+                "generation_spec": spec,
+                "created_at": datetime(2026, 8, 26, 12, i, tzinfo=timezone.utc),
+            })
+        stages, conditions = _recent_choices()
+        assert stages == set()
+        assert conditions == set()

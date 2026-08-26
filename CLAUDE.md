@@ -35,10 +35,11 @@ https://detective.mintflavor.ddns.net (이미지는 `cdn.mintflavor.ddns.net`).
 │   ├── lib/                # http.ts, api.ts, adminAuth.ts, utils.ts
 │   ├── types/game.ts
 │   └── page.tsx            # 페이즈 라우팅
+├── tests/frontend/         # vitest 50건 (훅·순수 함수)
 ├── server/                 # FastAPI 백엔드
 │   ├── app/                # config, db, gemini, storage, sanitize, models, auth, ratelimit
 │   │   └── routers/        # game, scenarios, feedbacks, admin
-│   ├── tests/              # pytest 217건
+│   ├── tests/              # pytest 239건
 │   └── Dockerfile          # 멀티스테이지 (기본 runtime, --target test)
 ├── infra/                  # Docker Compose 스택 + 운영 스크립트
 └── plan/                   # 설계·이전 계획 문서
@@ -64,7 +65,12 @@ git show $(git rev-list -1 HEAD -- lambda/handler.py):lambda/handler.py
 npm run dev          # 개발 서버 (3000)
 npm run build        # output:'standalone' 프로덕션 빌드
 npm run lint         # ESLint (next build는 lint를 돌리지 않는다)
+npm test             # vitest — tests/frontend/ (50건). Gemini 호출 없음
 ```
+
+> 프론트엔드 테스트는 `app/` 밖의 `tests/frontend/`에 둔다. `app/`은 App Router의
+> 라우팅 디렉터리라 테스트 파일을 섞으면 판단할 거리가 늘어난다 (`server/tests/`와 대칭).
+> API 계층(`useGeminiClient`)을 목으로 대체하므로 비용이 발생하지 않는다.
 
 > 로컬 `npm run dev`로 백엔드를 쓰려면 `API_INTERNAL_URL`을 실행 중인 api 주소로 지정한다.
 > 기본값은 컨테이너명 `http://todays-detective-api:8000`이라 호스트에서는 해석되지 않는다.
@@ -170,8 +176,14 @@ LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정�
 무작위성은 LLM에 맡기지 않고 `build_case_spec()`이 서버에서 뽑아 주입한다.
 "각 유형 20%"처럼 프롬프트로 부탁하면 따르지 않는다.
 생성 4회 실측으로 주입이 반영되는 것을 확인했다 (구 프롬프트는 범인이 4/4 id 2였는데
-신 프롬프트에서는 id 1이 2회 나왔다). 결과는 `scenarios.generation_audit`에
-불리언으로 남는다 — **지정 범인 id는 저장하지 않는다. 그 자체가 정답 노출이다.**
+신 프롬프트에서는 id 1이 2회 나왔다).
+
+선택값과 감사 결과는 `scenarios.generation_spec`·`generation_audit`에 남는다.
+**`culprit_id`와 `prompt`는 절대 저장하지 않는다** — 범인 id는 정답이고 프롬프트에는
+그 id가 적혀 있다. `CaseSpec.storable()`이 걸러 주므로 dict를 직접 만들지 말 것.
+
+무대·조건은 최근 20판/10판을 피해서 고른다. 이 회피는 **최적화이지 필수 경로가
+아니다** — DB 조회 실패나 후보 소진 시 전체 풀로 되돌아간다. 생성을 막지 않는다.
 
 `isCulprit`에 설명 문자열을 넣지 말 것. `find_culprit()`이 truthiness로 판정하므로
 `"false"`가 True가 되어 엉뚱한 인물이 범인이 된다. 저장 직전
@@ -188,7 +200,19 @@ LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정�
 `ErrorModal`에는 **항상 닫기가 있어야 한다** — 예전에 버튼이 재시도 하나뿐이라
 실패한 플레이어가 취할 수 있는 유일한 행동이 유료 API 재호출이었다.
 
-**7. 사건 생성은 25~31초 걸린다.**
+**7. 브라우저 뒤로가기는 `usePhaseHistory`가 가로챈다.**
+단일 페이지라 히스토리 엔트리가 없어서, 예전에는 뒤로가기 한 번이 곧 사이트 이탈이었다
+(수사 중이면 10분치 기록이 사라졌다). 게임 안에 있는 동안 **감시용 엔트리를 정확히
+하나만 유지**한다 — phase마다 push하면 게임을 나온 뒤 뒤로가기가 여러 번 먹통이 된다.
+`intro`에서는 이탈을 막지 않는다. 나갈 길이 없으면 그것도 함정이다.
+되돌릴 수 없는 이동(`briefing`·`loading`에서 나가기)은 반드시 확인을 받는다.
+
+**8. 취소 경로는 진행 중인 비동기 결과를 무효화해야 한다.**
+`useGameEngine`의 `generationEpoch`가 그 역할을 한다. 없으면 생성을 취소하고 인트로로
+나온 뒤에 응답이 도착해 **낡은 사건이 되살아나고**, 이어서 "새로운 의뢰"를 누르면
+159원을 또 쓰면서 화면에는 옛 사건이 뜬다.
+
+**9. 사건 생성은 25~31초 걸린다.**
 타임아웃이 3곳에 있다 — NPM(`proxy_read_timeout`), Next(`experimental.proxyTimeout`, 기본 30초),
 api. Next 기본값 때문에 성공 응답이 500이 된 적이 있다 (계획 §4-A).
 
