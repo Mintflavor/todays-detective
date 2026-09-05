@@ -351,9 +351,7 @@ unraid의 `user.scripts`에 AWS 시대의 `aws_s3_todays-detective_backup`(rclon
 
 - [x] `master`를 실제 운영 코드와 맞추기 (§2.3) — 2026-09-05 완료
 - [x] `server/app/__pycache__/*.pyc` git 추적 해제 및 `.gitignore` 추가 — 2026-09-05 완료
-- [ ] 레포 루트 `.env` 처리 — AWS 시대의 죽은 키들과 **무관한 `GITHUB_MCP_PAT`이 함께
-      들어 있다.** 이 PAT이 아직 살아 있는지 확인하고, 살아 있다면 파기하거나 옮길 것.
-      `.gitignore`에 있어 커밋되지는 않았다
+- [x] 레포 루트 `.env` 처리 (AWS 키 분리 및 백업, `.env.example` 생성) — 2026-09-05 완료
 
 ### 6.3 검토가 필요한 설계 판단
 
