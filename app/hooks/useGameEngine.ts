@@ -327,7 +327,10 @@ export default function useGameEngine() {
       setChatLogs(prev => {
         const nextList: ChatMessage[] = [...(prev[suspectId] ?? []), { role: 'ai', text: reply }];
         if (isContradiction) {
-          nextList.push({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+          nextList.push({
+            role: 'system',
+            text: '※ 조서 특기사항: 용의자의 미세한 동요 포착 — 확인된 사실과의 불일치',
+          });
         }
         if (isNewEvidence && unlockedEvidence) {
           nextList.push({

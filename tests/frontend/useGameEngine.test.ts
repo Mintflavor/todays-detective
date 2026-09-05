@@ -286,7 +286,10 @@ describe('심문 횟수는 용의자별로 따로다', () => {
     expect(logs).toHaveLength(4);
     expect(logs[1]).toEqual({ role: 'user', text: '알리바이가 뭡니까?' });
     expect(logs[2]).toEqual({ role: 'ai', text: '저는 계속 방에 있었습니다.' });
-    expect(logs[3]).toEqual({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+    expect(logs[3]).toEqual({
+      role: 'system',
+      text: '※ 조서 특기사항: 용의자의 미세한 동요 포착 — 확인된 사실과의 불일치',
+    });
   });
 
   it('용의자 진술이 모순이 아닐 때는 시스템 메시지가 삽입되지 않는다', async () => {
