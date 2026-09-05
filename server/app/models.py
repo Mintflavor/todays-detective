@@ -41,6 +41,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+    isContradiction: bool = False
 
 
 class DeductionData(BaseModel):

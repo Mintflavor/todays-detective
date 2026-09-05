@@ -65,12 +65,17 @@ async function generateCase(): Promise<CaseData> {
   return { ...body.caseData, scenarioId: body.scenarioId } as CaseData;
 }
 
+export interface InterrogateResult {
+  reply: string;
+  isContradiction: boolean;
+}
+
 async function interrogateSuspect(
   scenarioId: string,
   suspectId: number,
   history: string,
   userMsg: string
-): Promise<string> {
+): Promise<InterrogateResult> {
   let data: unknown;
   try {
     const response = await fetch(`${API_BASE}/api/game/chat`, {
@@ -83,7 +88,11 @@ async function interrogateSuspect(
     if (e instanceof ApiError) throw e;
     throw new ApiError(0, '서버에 연결할 수 없습니다.');
   }
-  return (data as { reply: string }).reply;
+  const body = data as { reply: string; isContradiction?: boolean };
+  return {
+    reply: body.reply,
+    isContradiction: Boolean(body.isContradiction),
+  };
 }
 
 async function evaluateDeduction(
@@ -127,7 +136,7 @@ interface UseGeminiClientReturn {
     suspectId: number,
     history: string,
     userMsg: string
-  ) => Promise<string>;
+  ) => Promise<InterrogateResult>;
   evaluateDeduction: (
     scenarioId: string,
     culpritName: string,

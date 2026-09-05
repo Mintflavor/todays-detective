@@ -245,7 +245,7 @@ describe('심문 횟수는 용의자별로 따로다', () => {
   });
 
   it('한 용의자에게 써도 다른 용의자의 몫은 줄지 않는다', async () => {
-    interrogateSuspect.mockResolvedValue('진술');
+    interrogateSuspect.mockResolvedValue({ reply: '진술', isContradiction: false });
 
     const { result } = renderHook(() => useGameEngine());
     act(() => result.current.handleLoadGame(makeCase('사건')));
@@ -264,6 +264,51 @@ describe('심문 횟수는 용의자별로 따로다', () => {
 
     expect(result.current.actionPoints[target]).toBe(total - 1);
     expect(result.current.actionPoints[other]).toBe(total);
+  });
+
+  it('용의자 진술이 모순일 때 조서에 붉은 시스템 메시지가 삽입된다', async () => {
+    interrogateSuspect.mockResolvedValue({ reply: '저는 계속 방에 있었습니다.', isContradiction: true });
+
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+
+    const target = result.current.caseData!.suspects[0].id;
+    act(() => result.current.setCurrentSuspectId(target));
+    await act(async () => {
+      result.current.handleInputChange({ target: { value: '알리바이가 뭡니까?' } } as never);
+    });
+    await act(async () => {
+      result.current.handleSendMessage();
+    });
+
+    const logs = result.current.chatLogs[target]!;
+    // 0: 초기 현장 정보, 1: user 질문, 2: ai 답변, 3: system 모순 알림
+    expect(logs).toHaveLength(4);
+    expect(logs[1]).toEqual({ role: 'user', text: '알리바이가 뭡니까?' });
+    expect(logs[2]).toEqual({ role: 'ai', text: '저는 계속 방에 있었습니다.' });
+    expect(logs[3]).toEqual({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+  });
+
+  it('용의자 진술이 모순이 아닐 때는 시스템 메시지가 삽입되지 않는다', async () => {
+    interrogateSuspect.mockResolvedValue({ reply: '아무것도 모릅니다.', isContradiction: false });
+
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+
+    const target = result.current.caseData!.suspects[0].id;
+    act(() => result.current.setCurrentSuspectId(target));
+    await act(async () => {
+      result.current.handleInputChange({ target: { value: '알리바이가 뭡니까?' } } as never);
+    });
+    await act(async () => {
+      result.current.handleSendMessage();
+    });
+
+    const logs = result.current.chatLogs[target]!;
+    // 0: 초기 현장 정보, 1: user 질문, 2: ai 답변
+    expect(logs).toHaveLength(3);
+    expect(logs[1]).toEqual({ role: 'user', text: '알리바이가 뭡니까?' });
+    expect(logs[2]).toEqual({ role: 'ai', text: '아무것도 모릅니다.' });
   });
 
   it('전체 잔량 합계도 내보낸다 (추리 화면용)', () => {

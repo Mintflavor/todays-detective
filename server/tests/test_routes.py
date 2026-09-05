@@ -17,19 +17,6 @@ from app import gemini, storage
 from app.sanitize import assert_no_spoilers
 
 
-@pytest.fixture
-def saved_scenario(test_db, full_case):
-    """정화되지 않은 원본을 테스트 DB에 넣고 id를 돌려준다."""
-    res = test_db["scenarios"].insert_one(
-        {
-            "title": full_case["title"],
-            "summary": full_case["summary"],
-            "crime_type": full_case["crime_type"],
-            "case_data": full_case,
-        }
-    )
-    return str(res.inserted_id)
-
 
 # ─────────────────────────── /healthz ───────────────────────────
 def test_healthz(client):
@@ -172,8 +159,8 @@ class TestChat:
         captured = {}
 
         def fake(prompt, model=None):
-            captured["prompt"] = prompt
-            captured["model"] = model
+            captured.setdefault("prompt", prompt)
+            captured.setdefault("model", model)
             return "저는 주방에 있었습니다."
 
         monkeypatch.setattr(gemini, "call_gemini", fake)

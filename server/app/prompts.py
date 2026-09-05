@@ -486,3 +486,42 @@ AI가 생성한 것이라도, 기존에 설정된 사건의 진상과 다른 내
 (탐정이 완벽한 추리를 했다면 "없음"이라고 출력하세요. 이 섹션은 반드시 출력해야 합니다.)
 (탐정이 추리에 실패했다면 범인의 이름 등 스포일러가 될 수 있는 내용은 절대 포함하지 마세요.)
 """
+
+
+def generate_contradiction_check_prompt(suspect, world, timeline, evidence, question, reply):
+    evidence_lines = "\n   ".join(
+        f"{i + 1}. {e.get('name', '')}: {e.get('description', '')}"
+        for i, e in enumerate(evidence or [])
+    )
+    timeline_text = "\n   ".join(timeline or [])
+
+    return f"""당신은 추리 사건의 사실 검증관입니다.
+아래 제공된 [객관적 사실]과 [용의자의 실제 행적 및 정보]를 바탕으로,
+용의자가 탐정의 질문에 답한 [용의자의 답변]에 명백한 사실 왜곡, 거짓말, 또는 확인된 사실과의 모순이 존재하는지 판단하세요.
+
+[객관적 사실]
+1. 장소 구조: {world.get("location", "")}
+2. 당시 상황: {world.get("weather", "")}
+3. 공통 타임라인:
+   {timeline_text}
+4. 현장 증거물:
+   {evidence_lines}
+
+[용의자 정보: {suspect.get("name", "")}({suspect.get("role", "")})]
+- 실제 행적: {suspect.get("real_action", "")}
+- 숨기고 있는 비밀: {suspect.get("secret", "")}
+- 주장하는 알리바이: {suspect.get("alibi_claim", "")}
+
+[심문 내용]
+탐정의 질문: {question}
+용의자의 답변: {reply}
+
+[판단 기준]
+1. 모순(TRUE): 용의자의 답변이 [객관적 사실]이나 자신의 [실제 행적]과 명백히 어긋나는 거짓말을 하거나, 알리바이를 날조하거나, 현장에 없었다고 거짓 진술하는 경우.
+2. 모순 아님(FALSE): 답변이 실제 행적 및 객관적 사실과 일치하거나, 단순히 "모른다", "기억이 안 난다"고 회피하거나, 감정적인 반응만 보이는 경우.
+
+반드시 다음 형식 중 하나로만 정확히 출력하세요:
+[CONTRADICTION: TRUE]
+또는
+[CONTRADICTION: FALSE]
+"""
