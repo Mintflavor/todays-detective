@@ -213,3 +213,17 @@ def evaluation_text() -> str:
         "다만 동기에 대한 언급이 부족했습니다.\n\n"
         "[ADVICE]\n아쉬운 점: 유언장의 존재를 물어봤어야 했다.\n"
     )
+
+
+@pytest.fixture
+def saved_scenario(test_db, full_case):
+    """정화되지 않은 원본을 테스트 DB에 넣고 id를 돌려준다."""
+    res = test_db["scenarios"].insert_one(
+        {
+            "title": full_case["title"],
+            "summary": full_case["summary"],
+            "crime_type": full_case["crime_type"],
+            "case_data": full_case,
+        }
+    )
+    return str(res.inserted_id)

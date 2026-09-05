@@ -38,6 +38,7 @@ from ..models import (
 )
 from ..prompts import (
     build_case_spec,
+    generate_contradiction_check_prompt,
     generate_evaluation_prompt,
     generate_portrait_prompt,
     generate_suspect_prompt,
@@ -310,6 +311,47 @@ def start_case(request: Request) -> GameStartResponse:
 
 
 # ─────────────────────────── 용의자 심문 ───────────────────────────
+_CONTRADICTION_RE = re.compile(r"\[CONTRADICTION:\s*(TRUE|FALSE)\]", re.IGNORECASE)
+
+
+def check_contradiction(
+    suspect: dict[str, Any],
+    case_data: dict[str, Any],
+    question: str,
+    reply: str,
+) -> bool:
+    """용의자의 답변이 객관적 사실과 모순되는지 검증한다.
+
+    실패 시 1회 즉시 재시도하며, 재실패하거나 파싱 불능 시 False로 폴백한다.
+    """
+    prompt = generate_contradiction_check_prompt(
+        suspect,
+        case_data.get("world_setting") or {},
+        case_data.get("timeline_truth") or [],
+        case_data.get("evidence_list") or [],
+        question,
+        reply,
+    )
+    chat_model = get_settings().chat_model
+
+    for attempt in range(2):
+        try:
+            result = gemini.call_gemini(prompt, chat_model)
+            match = _CONTRADICTION_RE.search(result)
+            if match:
+                return match.group(1).upper() == "TRUE"
+            logger.warning(
+                "모순 판정 파싱 실패 (attempt %d/2): %s", attempt + 1, result[:100]
+            )
+        except Exception as exc:
+            logger.warning(
+                "모순 판정 LLM 호출 실패 (attempt %d/2): %s", attempt + 1, exc
+            )
+
+    logger.warning("모순 판정 최종 실패 — False로 폴백합니다")
+    return False
+
+
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit(_settings.rate_limit_chat, key_func=global_key)
 def chat(request: Request, req: ChatRequest) -> ChatResponse:
@@ -341,7 +383,11 @@ def chat(request: Request, req: ChatRequest) -> ChatResponse:
 
     # GEMINI_CHAT_MODEL or GEMINI_MODEL 폴백 (config.chat_model이 담당)
     reply = gemini.call_gemini(full_prompt, get_settings().chat_model)
-    return ChatResponse(reply=reply)
+
+    # 모순 여부 판정 (1회 재시도 후 False 폴백)
+    is_contradiction = check_contradiction(suspect, case_data, req.message, reply)
+
+    return ChatResponse(reply=reply, isContradiction=is_contradiction)
 
 
 # ─────────────────────────── 추리 평가 ───────────────────────────

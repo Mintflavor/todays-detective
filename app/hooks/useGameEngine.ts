@@ -305,11 +305,17 @@ export default function useGameEngine() {
     if (!caseData?.scenarioId) return;
     setIsTyping(true);
     try {
-      const reply = await interrogateSuspect(caseData.scenarioId, suspectId, history, text);
-      setChatLogs(prev => ({
-        ...prev,
-        [suspectId]: [...(prev[suspectId] ?? []), { role: 'ai', text: reply }]
-      }));
+      const { reply, isContradiction } = await interrogateSuspect(caseData.scenarioId, suspectId, history, text);
+      setChatLogs(prev => {
+        const nextList: ChatMessage[] = [...(prev[suspectId] ?? []), { role: 'ai', text: reply }];
+        if (isContradiction) {
+          nextList.push({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+        }
+        return {
+          ...prev,
+          [suspectId]: nextList,
+        };
+      });
     } catch (err) {
       console.error("Interrogation error:", err);
       const rateLimited = err instanceof ApiError && err.isRateLimited;
