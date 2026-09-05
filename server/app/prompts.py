@@ -286,6 +286,10 @@ CASE_GENERATION_HEADER = """
    "trick": "world_setting과 evidence_list를 활용한 구체적이고 논리적인 트릭"
    isCulprit은 반드시 JSON boolean(true/false)이어야 합니다. 문자열로 쓰지 마세요.
 6. 증거물 개수: evidence_list는 [지정 조건]에 명시된 개수를 정확히 지키세요. 범인을 직접 특정하는 단서(이름, 주민번호, 이니셜 등)는 금지이며, 간접적이고 정황적인 증거여야 합니다.
+7. 페어플레이(추리 공정성) 및 배경 서사 원칙:
+   - 결말(solution)에 등장하는 모든 핵심 범행 동기, 인물 간 갈등, 트릭의 근거는 사전에 evidence_list, timeline_truth, 또는 용의자의 relationship_to_victim/secret에 반드시 복선으로 암시되어 있어야 합니다.
+   - 플레이어가 사전에 알 수 없는 뜬금없는 숨겨진 과거사나 미지의 제3자 설정을 결말에 갑자기 창조하는 것을 엄격히 금지합니다.
+   - summary와 world_setting에는 인물들이 사건 당일 그 장소에 모이게 된 공통의 이유(근무, 모임, 행사 등)와 사건 직전의 긴장 관계를 구체적으로 서술하세요.
 """
 
 CASE_SCHEMA_BODY = """
@@ -322,6 +326,8 @@ CASE_SCHEMA_BODY = """
       "gender": "Male 또는 Female",
       "age": 30,
       "personality": "성격 묘사",
+      "relationship_to_victim": "피해자와의 관계 및 평소 감정",
+      "relationships_to_others": "다른 용의자 2명에 대한 인상과 평소 관계 요약",
       "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어, 콤마 구분. 예: Short hair, glasses, sharp eyes, wearing a suit)",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심받을 만한 행동)",
       "isCulprit": false,
@@ -335,6 +341,8 @@ CASE_SCHEMA_BODY = """
       "gender": "Male 또는 Female",
       "age": 40,
       "personality": "성격 묘사",
+      "relationship_to_victim": "피해자와의 관계 및 평소 감정",
+      "relationships_to_others": "다른 용의자 2명에 대한 인상과 평소 관계 요약",
       "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어, 콤마 구분. 예: Short hair, glasses, sharp eyes, wearing a suit)",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심받을 만한 행동)",
       "isCulprit": false,
@@ -348,6 +356,8 @@ CASE_SCHEMA_BODY = """
       "gender": "Male 또는 Female",
       "age": 50,
       "personality": "성격 묘사",
+      "relationship_to_victim": "피해자와의 관계 및 평소 감정",
+      "relationships_to_others": "다른 용의자 2명에 대한 인상과 평소 관계 요약",
       "image_prompt_keywords": "외모 묘사 키워드 (반드시 영어, 콤마 구분. 예: Short hair, glasses, sharp eyes, wearing a suit)",
       "secret": "숨기고 있는 비밀 (범인이 아니더라도 의심받을 만한 행동)",
       "isCulprit": false,
@@ -377,45 +387,76 @@ def generate_portrait_prompt(suspect):
     return f"{base}, {age} year old {gender} {role}, {personality} expression, {keywords}"
 
 
-def generate_suspect_prompt(suspect, world, timeline, evidence):
+def generate_suspect_prompt(
+    suspect,
+    world,
+    timeline,
+    evidence,
+    all_suspects=None,
+    victim_info=None,
+):
     evidence_lines = "\n   ".join(
         f"{i + 1}. {e.get('name', '')}: {e.get('description', '')}"
         for i, e in enumerate(evidence or [])
     )
     timeline_text = "\n   ".join(timeline or [])
     is_culprit = suspect.get("isCulprit", False)
-    culprit_hint = (
-        "당신은 진범입니다. 논리적으로 거짓말을 꾸며내세요."
-        if is_culprit
-        else "당신은 결백합니다. 사실대로 말하거나 억울해하세요."
+
+    # 동료 용의자 정보 (스포일러 필드 제외)
+    other_suspects_lines = []
+    for s in all_suspects or []:
+        if isinstance(s, dict) and s.get("id") != suspect.get("id"):
+            other_suspects_lines.append(f"- {s.get('name', '용의자')}({s.get('role', '')})")
+    other_suspects_text = (
+        "\n   ".join(other_suspects_lines) if other_suspects_lines else "다른 용의자 정보 없음"
     )
 
-    return f"""
-당신은 추리 게임의 용의자 '{suspect.get("name", "")}'({suspect.get("role", "")})입니다.
+    victim_section = ""
+    if victim_info and isinstance(victim_info, dict):
+        victim_section = (
+            f"\n[피해자 정보]\n"
+            f"- 이름: {victim_info.get('name', '피해자')}\n"
+            f"- 피해 상황: {victim_info.get('damage_details', '')} ({victim_info.get('body_condition', '')})\n"
+            f"- 사망/피해 추정 시각: {victim_info.get('incident_time', '')}"
+        )
+
+    culprit_hint = (
+        "당신은 진범입니다. 겉으로는 수사에 매우 협조적이고 예의 바른 태도를 취하면서, 논리적인 거짓 알리바이와 변명을 둘러대고 교묘하게 다른 사람에게 의심을 돌리세요. 무작정 '모른다'고 잡아떼면 오히려 의심받습니다."
+        if is_culprit
+        else "당신은 결백합니다. 탐정의 질문에 적극적으로 협조하세요. 당신이 현장이나 타임라인에서 직접 목격한 상황, 다른 사람의 수상한 행동이나 단서를 적극적으로 진술하세요. 단, 당신만의 사적인 [비밀]에 대해서만 당황하거나 말을 얼버무리세요."
+    )
+
+    return f"""당신은 추리 게임의 용의자 '{suspect.get("name", "")}'({suspect.get("role", "")})입니다.
 탐정(플레이어)이 당신을 심문하고 있습니다.
 
 [절대적 사실 - 당신의 기억 속에 명확히 존재합니다]
 이 설정은 절대 변하지 않으며, 당신은 이 세계관 안에서만 대답해야 합니다.
 1. 장소 구조: {world.get("location", "")}
-   - 경고: 위 묘사에 없는 방이나 구조를 절대 지어내지 마세요. 모르면 "모른다"고 답하세요.
+   - 경고: 위 묘사에 없는 방이나 구조를 절대 지어내지 마세요.
 2. 당시 상황: {world.get("weather", "")}
 3. 공통 타임라인:
    {timeline_text}
    (단, 당신이 직접 보지 못한 타인의 은밀한 행동은 모릅니다.)
 4. 현장에서 발견된 증거물 (탐정이 언급할 수 있습니다. 이 목록에 없는 증거는 존재하지 않습니다):
    {evidence_lines}
+{victim_section}
+
+[함께 있던 다른 인물들]
+   {other_suspects_text}
 
 [당신의 설정]
 - 성격: {suspect.get("personality", "")}
-- 비밀: {suspect.get("secret", "")} (들키지 않으려 노력하세요)
+- 피해자와의 관계: {suspect.get("relationship_to_victim", "면식 있음")}
+- 다른 인물들에 대한 생각/관계: {suspect.get("relationships_to_others", "동료 혹은 면식 있음")}
+- 비밀: {suspect.get("secret", "")} (사적인 치부/비밀이며, 이 주제가 나오면 당황하거나 회피하려 합니다)
 - 실제 행적: {suspect.get("real_action", "")}
 - 주장하는 알리바이: {suspect.get("alibi_claim", "")}
 - 범인 여부: {culprit_hint}
 
 [대화 지침]
-- 답변은 구어체로 자연스럽게, 2문장 이내로 짧게 하세요.
-- 탐정이 구체적인 물건/장소를 물어보면 [절대적 사실]에 근거해 답하세요.
-- [절대적 사실]에 없는 내용은 상상해서 지어내지 말고 "기억이 안 난다", "모르겠다"고 회피하세요.
+- 답변은 구어체로 자연스럽게, 2~3문장 내외로 구체적으로 하세요.
+- 단순히 "모른다", "기억 안 난다"로 일관하지 말고, 자신의 성격, 행적, 피해자 및 동료들과의 관계에 기반해 자연스럽고 입체적으로 대화하세요.
+- 피해자나 다른 인물들에 대해 질문을 받으면 당신이 알고 있는 관계와 인상을 바탕으로 진술하세요.
 """
 
 
@@ -508,6 +549,8 @@ def generate_contradiction_check_prompt(suspect, world, timeline, evidence, ques
    {evidence_lines}
 
 [용의자 정보: {suspect.get("name", "")}({suspect.get("role", "")})]
+- 피해자와의 관계: {suspect.get("relationship_to_victim", "면식 있음")}
+- 다른 인물들에 대한 관계: {suspect.get("relationships_to_others", "면식 있음")}
 - 실제 행적: {suspect.get("real_action", "")}
 - 숨기고 있는 비밀: {suspect.get("secret", "")}
 - 주장하는 알리바이: {suspect.get("alibi_claim", "")}

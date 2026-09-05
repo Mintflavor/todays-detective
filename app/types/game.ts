@@ -13,6 +13,8 @@ export interface Suspect {
   portraitImage?: string; // S3/MinIO URL (구 데이터는 Base64 문자열)
   image_prompt_keywords?: string;
   personality: string;
+  relationship_to_victim?: string;
+  relationships_to_others?: string;
   // 아래 두 필드는 서버 정화본에 **존재하지 않는다** (SPOILER_SUSPECT_FIELDS).
   // 관리자 화면이 원본을 직접 조회할 때만 채워진다.
   secret?: string;

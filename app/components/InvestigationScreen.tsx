@@ -388,6 +388,7 @@ export default function InvestigationScreen({
                     ? '나 혼자 보는 기록. 행동력을 쓰지 않는다.'
                     : [
                         currentSuspect?.role,
+                        currentSuspect?.relationship_to_victim,
                         currentSuspect?.age ? `${currentSuspect.age}세` : null,
                       ]
                         .filter(Boolean)

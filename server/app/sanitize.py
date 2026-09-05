@@ -60,6 +60,8 @@ _KNOWN_SUSPECT_FIELDS = frozenset(
         "trick",
         "real_action",
         "alibi_claim",
+        "relationship_to_victim",
+        "relationships_to_others",
         # 서버가 덧붙이는 필드
         "portraitImage",
     }
