@@ -326,4 +326,37 @@ describe('심문 횟수는 용의자별로 따로다', () => {
     act(() => result.current.resetGame());
     expect(result.current.actionPoints).toEqual({});
   });
+
+  describe('증거 제시 및 해금', () => {
+    it('증거를 첨부하여 질문을 보내면 displayText에 증거 제시가 포함되고 해금된 증거가 등록된다', async () => {
+      interrogateSuspect.mockResolvedValue({
+        reply: '사실 그 열쇠는 제가 숨겼습니다.',
+        isContradiction: false,
+        unlockedEvidence: { name: '비밀 열쇠', description: '화분 밑에서 발견' },
+      });
+
+      const { result } = renderHook(() => useGameEngine());
+      act(() => result.current.handleLoadGame(makeCase('사건')));
+
+      const target = result.current.caseData!.suspects[0].id;
+      act(() => result.current.setCurrentSuspectId(target));
+
+      act(() => result.current.setSelectedEvidenceName('피 묻은 손수건'));
+      await act(async () => {
+        result.current.handleInputChange({ target: { value: '이 손수건을 보십시오.' } } as never);
+      });
+      await act(async () => {
+        result.current.handleSendMessage();
+      });
+
+      const logs = result.current.chatLogs[target]!;
+      expect(logs[1].text).toContain('[증거 제시: 피 묻은 손수건]');
+      expect(logs[2].text).toBe('사실 그 열쇠는 제가 숨겼습니다.');
+      expect(logs[3].role).toBe('system');
+      expect(logs[3].text).toContain('새로운 증거 확보: [비밀 열쇠]');
+
+      const evidenceList = result.current.caseData!.evidence_list;
+      expect(evidenceList.some(e => e.name === '비밀 열쇠')).toBe(true);
+    });
+  });
 });

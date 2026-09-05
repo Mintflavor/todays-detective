@@ -17,7 +17,7 @@
  */
 
 import { API_BASE, ApiError, errorMessage, readJson } from '../lib/http';
-import { CaseData, Evaluation } from '../types/game';
+import { CaseData, Evaluation, Evidence } from '../types/game';
 
 /**
  * 사건 생성 상한 타임아웃.
@@ -68,30 +68,45 @@ async function generateCase(): Promise<CaseData> {
 export interface InterrogateResult {
   reply: string;
   isContradiction: boolean;
+  unlockedEvidence?: Evidence;
 }
 
 async function interrogateSuspect(
   scenarioId: string,
   suspectId: number,
   history: string,
-  userMsg: string
+  userMsg: string,
+  presentedEvidenceName?: string,
+  unlockedEvidenceNames?: string[]
 ): Promise<InterrogateResult> {
   let data: unknown;
   try {
     const response = await fetch(`${API_BASE}/api/game/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ scenarioId, suspectId, message: userMsg, history }),
+      body: JSON.stringify({
+        scenarioId,
+        suspectId,
+        message: userMsg,
+        history,
+        presentedEvidenceName,
+        unlockedEvidenceNames,
+      }),
     });
     data = await ensureOk(response, '용의자와의 통신이 불안정합니다.');
   } catch (e) {
     if (e instanceof ApiError) throw e;
     throw new ApiError(0, '서버에 연결할 수 없습니다.');
   }
-  const body = data as { reply: string; isContradiction?: boolean };
+  const body = data as {
+    reply: string;
+    isContradiction?: boolean;
+    unlockedEvidence?: Evidence;
+  };
   return {
     reply: body.reply,
     isContradiction: Boolean(body.isContradiction),
+    unlockedEvidence: body.unlockedEvidence,
   };
 }
 
@@ -99,7 +114,8 @@ async function evaluateDeduction(
   scenarioId: string,
   culpritName: string,
   reasoning: string,
-  isOverTime: boolean
+  isOverTime: boolean,
+  unlockedEvidenceNames?: string[]
 ): Promise<Evaluation> {
   let data: unknown;
   try {
@@ -108,7 +124,12 @@ async function evaluateDeduction(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         scenarioId,
-        deductionData: { culpritName, reasoning, isOverTime },
+        deductionData: {
+          culpritName,
+          reasoning,
+          isOverTime,
+          unlockedEvidenceNames,
+        },
       }),
     });
     data = await ensureOk(response, '추리 평가 중 오류가 발생했습니다.');
@@ -135,13 +156,16 @@ interface UseGeminiClientReturn {
     scenarioId: string,
     suspectId: number,
     history: string,
-    userMsg: string
+    userMsg: string,
+    presentedEvidenceName?: string,
+    unlockedEvidenceNames?: string[]
   ) => Promise<InterrogateResult>;
   evaluateDeduction: (
     scenarioId: string,
     culpritName: string,
     reasoning: string,
-    isOverTime: boolean
+    isOverTime: boolean,
+    unlockedEvidenceNames?: string[]
   ) => Promise<Evaluation>;
 }
 

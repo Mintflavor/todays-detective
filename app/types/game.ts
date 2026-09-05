@@ -35,6 +35,7 @@ export interface VictimInfo {
 export interface Evidence {
   name: string;
   description: string;
+  isUnlocked?: boolean;
 }
 
 export interface WorldSetting {

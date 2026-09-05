@@ -17,7 +17,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ── 아래 두 상수는 Lambda 원문과 글자 단위로 동일하다 ──────────────────
-SPOILER_TOP_FIELDS: tuple[str, ...] = ("solution", "timeline_truth", "truth")
+SPOILER_TOP_FIELDS: tuple[str, ...] = (
+    "solution",
+    "timeline_truth",
+    "truth",
+    "hidden_evidence_list",
+)
 SPOILER_SUSPECT_FIELDS: tuple[str, ...] = (
     "isCulprit",
     "secret",
@@ -37,6 +42,7 @@ _KNOWN_TOP_FIELDS = frozenset(
         "world_setting",
         "victim_info",
         "evidence_list",
+        "hidden_evidence_list",
         "timeline_truth",
         "suspects",
         "solution",
