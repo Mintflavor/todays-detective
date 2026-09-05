@@ -52,6 +52,38 @@ docker compose -f $C -f $O -p todays-detective down
 > `-f` 두 개를 모두 넘겨야 플러그인이 인식하는 구성과 일치한다. override를 빼고 올리면
 > UI에서 Start를 눌렀을 때 컨테이너가 불필요하게 재생성된다.
 
+## 원클릭 배포 스크립트 (`deploy.ps1`, `deploy.sh`)
+
+프로젝트 루트의 배포 스크립트를 사용하여 개발 PC에서 한 번의 명령으로 unraid에 안전하게 배포할 수 있다.
+이 스크립트는 **SSH 연결 확인 → 소스 아카이빙(tar) → unraid 전송(scp) → 디렉터리 롤링 백업(.prev) → Docker Compose 빌드 및 기동 → 헬스체크**를 자동으로 수행한다.
+
+### Windows (PowerShell)
+```powershell
+# 전체 배포 (Web + API + Infra)
+.\deploy.ps1
+
+# Web 프론트엔드만 배포
+.\deploy.ps1 web
+
+# API 백엔드만 배포
+.\deploy.ps1 api
+
+# 이전 버전으로 롤백
+.\deploy.ps1 -Rollback
+```
+
+### Linux / WSL / Git Bash
+```bash
+# 전체 배포
+./deploy.sh
+
+# Web 프론트엔드만 배포
+./deploy.sh web
+
+# 이전 버전으로 롤백
+./deploy.sh --rollback
+```
+
 ## 최초 배포 절차
 
 ```bash
