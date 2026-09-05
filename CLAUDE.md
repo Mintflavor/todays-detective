@@ -16,7 +16,7 @@ Ownership of this code belongs to the author, and some or all of the code below 
 
 ## Project Overview
 
-**오늘의 탐정 (Today's Detective)** — Gemini가 생성한 사건을 플레이어가 10분 안에 용의자 3명을
+**오늘의 탐정 (Today's Detective)** — Gemini가 생성한 사건을 플레이어가 20분 안에 용의자 3명을
 심문해 범인을 추리하고, AI가 등급(S~F)을 매기는 웹 추리게임.
 
 **자체 호스팅 중**: unraid 서버의 Docker Compose 스택. 공개 주소는
@@ -110,7 +110,7 @@ unraid 웹UI **Docker → Compose** 탭에서 스택을 Start/Stop할 수 있다
 
 `intro` → `load_menu` → `briefing` → `tutorial` → `loading` → `investigation` → `deduction` → `resolution`
 
-- **investigation**: 10분 타이머, 20 AP로 용의자 3명 심문
+- **investigation**: 20분 타이머. 심문 횟수는 **용의자 1명당 20회**(공유 풀이 아니다, 총 60회)
 - **resolution**: Gemini가 등급·보고서·조언을 반환
 
 ### 컨테이너 구성
@@ -156,9 +156,16 @@ api 컨테이너로 넘긴다 → CORS가 발생하지 않고 `NEXT_PUBLIC_*` �
 [server/app/routers/game.py](server/app/routers/game.py)의 정규식 3개와 폴백 문구를 바꾸면
 모든 추리가 `F` / "보고서 생성 실패"로 나온다. `tests/test_evaluate_parsing.py` 참조.
 
-**3. Gemini 예산이 월 5,000원이다.**
-새 사건 생성 159원, 기록 재생 11.7원(15배 저렴). 레이트 리밋을 끄거나 늘리기 전에
-`server/app/ratelimit.py`의 단가 계산을 읽을 것. 카운터는 Mongo에 있어 재시작에도 유지된다.
+**3. Gemini 비용은 사건 생성이 거의 전부다.**
+새 사건 생성 159원(초상화 3장이 93%), 기록 재생 11.7원(15배 저렴), 심문 1회 0.68원.
+레이트 리밋을 끄거나 늘리기 전에 `server/app/ratelimit.py`의 단가 계산을 읽을 것.
+카운터는 Mongo에 있어 재시작에도 유지된다.
+
+한도의 기준은 **하루 세 판을 여유롭게**다 (개발용 키를 쓰기로 하면서 월 5,000원
+고정에서 바뀌었다). 조일 곳은 항상 `rate_limit_start_global`의 월 한도다 —
+심문에 월 한도를 걸면 수사 중에 끊겨 그 판이 통째로 버려진다.
+`tests/test_ratelimit.py`가 곱셈으로 상한을 검증하므로, 리밋을 올릴 때
+그 테스트를 지우지 말고 전제를 갱신할 것.
 
 **4. `case_data`를 엄격한 스키마로 만들지 말 것.**
 LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정상 시나리오까지 422로 튕긴다.
@@ -200,19 +207,55 @@ LLM 생성 JSON이라 필드가 유동적이다. 스키마를 강제하면 정�
 `ErrorModal`에는 **항상 닫기가 있어야 한다** — 예전에 버튼이 재시도 하나뿐이라
 실패한 플레이어가 취할 수 있는 유일한 행동이 유료 API 재호출이었다.
 
-**7. 브라우저 뒤로가기는 `usePhaseHistory`가 가로챈다.**
+**7. 시간 제한은 세 곳에 흩어져 있다 — 프론트·프롬프트·문구.**
+[useGameEngine.ts](app/hooks/useGameEngine.ts)의 `TOTAL_SECONDS`만 바꾸면 **AI 채점이 어긋난다.**
+[server/app/prompts.py](server/app/prompts.py)의 평가 프롬프트에 "제한시간(20분)"이 두 곳
+박혀 있어서, 여기가 옛 값이면 20분 게임인데 10분 기준으로 시간 관리 점수를 0점 준다.
+**예외가 나지 않고 등급만 조용히 낮아진다.** 인트로 문구·메타데이터 description·튜토리얼·
+시간초과 모달의 "N분"도 같이 봐야 한다.
+
+**8. 타이머가 멈춰도 예외가 나지 않는다.**
+[useGameTimer.ts](app/hooks/useGameTimer.ts)는 **끝나는 시각을 잡아두고 남은 시간을
+계산한다.** "남은 초를 1씩 깎는" 방식으로 되돌리지 말 것 — 세 가지가 조용히 깨진다:
+
+- effect가 `onTimeUp`에 의존하면, 호출부가 인라인 화살표 함수를 넘기는 순간
+  **키를 누를 때마다 interval이 재시작**한다. 1초보다 빠르게 치면 한 번도 발화하지
+  않아 **타이핑하는 동안 시간이 멈춘다** (실제로 있었던 버그).
+- `timerSeconds`가 의존성에 있으면 매 tick마다 interval을 다시 만들어 20분에 걸쳐
+  오차가 쌓인다.
+- 브라우저는 배경 탭의 타이머를 1분에 한 번까지 조인다. 초를 직접 깎으면 그만큼
+  시간이 사라진다 — 창을 내려두면 되는 셈이다.
+
+`tests/frontend/useGameTimer.test.ts`가 세 가지를 모두 고정한다. 배경 탭 검증에
+`advanceTimersByTime`을 쓰면 **가짜 타이머가 밀린 tick을 전부 실행해 거짓 통과한다**
+(한 번 그랬다). 시계만 옮기고(`setSystemTime`) tick은 한 번만 발화시켜야 한다.
+
+`isActive`는 `phase === 'investigation' && !isTyping`이다. `isTyping`은 플레이어가
+아니라 **AI가 답변을 만드는 중**이라는 뜻이고, 그동안은 의도적으로 멈춘다.
+
+**9. 심문 횟수는 용의자별이고, 레이트 리밋과 묶여 있다.**
+`AP_PER_SUSPECT`는 **한 명당** 값이라 한 판의 상한은 그 값 x 용의자 수(현재 60회)다.
+이 값을 올리면 `RATE_LIMIT_CHAT`(전역 시간당)도 같이 올려야 한다 — 한 판이 전역 한도를
+다 쓰면 **다른 접속자가 수사 중에 429를 받는다.** 심문에는 월 한도를 걸지 않는다:
+수사 중에 끊기면 그 판이 통째로 버려진다. 단가 계산은
+[server/app/ratelimit.py](server/app/ratelimit.py) 주석에 있다.
+
+AP 맵은 `chatLogs`와 같은 이유로 **용의자 id를 1~3으로 가정하지 않는다.**
+`case_data`는 스키마를 걸지 않은 LLM 출력이라 id가 달라질 수 있다.
+
+**10. 브라우저 뒤로가기는 `usePhaseHistory`가 가로챈다.**
 단일 페이지라 히스토리 엔트리가 없어서, 예전에는 뒤로가기 한 번이 곧 사이트 이탈이었다
-(수사 중이면 10분치 기록이 사라졌다). 게임 안에 있는 동안 **감시용 엔트리를 정확히
+(수사 중이면 20분치 기록이 사라졌다). 게임 안에 있는 동안 **감시용 엔트리를 정확히
 하나만 유지**한다 — phase마다 push하면 게임을 나온 뒤 뒤로가기가 여러 번 먹통이 된다.
 `intro`에서는 이탈을 막지 않는다. 나갈 길이 없으면 그것도 함정이다.
 되돌릴 수 없는 이동(`briefing`·`loading`에서 나가기)은 반드시 확인을 받는다.
 
-**8. 취소 경로는 진행 중인 비동기 결과를 무효화해야 한다.**
+**11. 취소 경로는 진행 중인 비동기 결과를 무효화해야 한다.**
 `useGameEngine`의 `generationEpoch`가 그 역할을 한다. 없으면 생성을 취소하고 인트로로
 나온 뒤에 응답이 도착해 **낡은 사건이 되살아나고**, 이어서 "새로운 의뢰"를 누르면
 159원을 또 쓰면서 화면에는 옛 사건이 뜬다.
 
-**9. 사건 생성은 25~31초 걸린다.**
+**12. 사건 생성은 25~31초 걸린다.**
 타임아웃이 3곳에 있다 — NPM(`proxy_read_timeout`), Next(`experimental.proxyTimeout`, 기본 30초),
 api. Next 기본값 때문에 성공 응답이 500이 된 적이 있다 (계획 §4-A).
 

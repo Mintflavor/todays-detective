@@ -210,3 +210,75 @@ describe('사건 시작', () => {
     expect(result.current.phase).toBe('briefing');
   });
 });
+
+describe('심문 횟수는 용의자별로 따로다', () => {
+  // 예전에는 20을 셋이 공유했다. 한 명에게 다 쓰면 나머지 둘은 아예 만나지 못했다 —
+  // 플레이어의 선택이 아니라 규칙이 만든 데드엔드였다.
+  beforeEach(() => {
+    localStorage.setItem('td_tutorial_seen', '1');
+  });
+
+  it('용의자 id마다 몫을 만든다', () => {
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+
+    const total = result.current.totalActionPoints;
+    for (const s of result.current.caseData!.suspects) {
+      expect(result.current.actionPoints[s.id]).toBe(total);
+    }
+    // 수사 수첩은 AP를 쓰지 않으므로 몫이 없다.
+    expect(result.current.actionPoints[0]).toBeUndefined();
+  });
+
+  it('id를 1~3으로 가정하지 않는다', () => {
+    // case_data는 스키마를 걸지 않은 LLM 출력이라 id가 달라질 수 있다.
+    const odd = makeCase('사건');
+    odd.suspects = [
+      { id: 7, name: '가', role: '역', personality: 'p' },
+      { id: 9, name: '나', role: '역', personality: 'p' },
+    ];
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(odd));
+
+    expect(result.current.actionPoints[7]).toBe(result.current.totalActionPoints);
+    expect(result.current.actionPoints[9]).toBe(result.current.totalActionPoints);
+  });
+
+  it('한 용의자에게 써도 다른 용의자의 몫은 줄지 않는다', async () => {
+    interrogateSuspect.mockResolvedValue('진술');
+
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+
+    const ids = result.current.caseData!.suspects.map((s) => s.id);
+    const [target, other] = ids;
+    const total = result.current.totalActionPoints;
+
+    act(() => result.current.setCurrentSuspectId(target));
+    await act(async () => {
+      result.current.handleInputChange({ target: { value: '어디 있었습니까?' } } as never);
+    });
+    await act(async () => {
+      result.current.handleSendMessage();
+    });
+
+    expect(result.current.actionPoints[target]).toBe(total - 1);
+    expect(result.current.actionPoints[other]).toBe(total);
+  });
+
+  it('전체 잔량 합계도 내보낸다 (추리 화면용)', () => {
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+
+    const count = result.current.caseData!.suspects.length;
+    expect(result.current.apGrandTotal).toBe(count * result.current.totalActionPoints);
+    expect(result.current.apRemainingTotal).toBe(result.current.apGrandTotal);
+  });
+
+  it('초기화하면 몫이 사라진다', () => {
+    const { result } = renderHook(() => useGameEngine());
+    act(() => result.current.handleLoadGame(makeCase('사건')));
+    act(() => result.current.resetGame());
+    expect(result.current.actionPoints).toEqual({});
+  });
+});

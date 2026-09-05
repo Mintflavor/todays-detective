@@ -36,7 +36,7 @@ function Section({
 }) {
   return (
     <section>
-      <h3 className="flex items-center gap-1.5 mb-2 font-dossier text-[10px] font-bold uppercase tracking-[0.22em] text-stamp">
+      <h3 className="flex items-center gap-1.5 mb-2 font-dossier text-[0.625rem] font-bold uppercase tracking-[0.22em] text-stamp">
         {icon}
         {label}
       </h3>
@@ -52,14 +52,14 @@ export default function CaseFileRail({ caseData }: CaseFileRailProps) {
     <div className="font-record text-ink">
       {/* 사건 개요 */}
       <Section icon={<FileText size={11} />} label="사건 개요">
-        <p className="text-[14px] leading-[1.85] text-ink-soft">{caseData.summary}</p>
+        <p className="text-[0.875rem] leading-[1.85] text-ink-soft">{caseData.summary}</p>
       </Section>
 
       <hr className="my-4 border-0 border-t border-dashed border-ink/20" />
 
       {/* 현장 */}
       <Section icon={<MapPin size={11} />} label="현장">
-        <dl className="space-y-1.5 text-[14px]">
+        <dl className="space-y-1.5 text-[0.875rem]">
           <div className="flex gap-2">
             <dt className="w-14 shrink-0 text-ink-faint">장소</dt>
             <dd className="flex-1">{world.location}</dd>
@@ -75,14 +75,14 @@ export default function CaseFileRail({ caseData }: CaseFileRailProps) {
 
       {/* 피해 */}
       <Section icon={<UserX size={11} />} label="피해자">
-        <dl className="space-y-1.5 text-[14px]">
+        <dl className="space-y-1.5 text-[0.875rem]">
           <div className="flex gap-2">
             <dt className="w-14 shrink-0 text-ink-faint">성명</dt>
             <dd className="flex-1 font-bold">{victim.name}</dd>
           </div>
           <div className="flex gap-2">
             <dt className="w-14 shrink-0 text-ink-faint">발생</dt>
-            <dd className="flex-1 font-type text-[13px]">{victim.incident_time}</dd>
+            <dd className="flex-1 font-type text-[0.8125rem]">{victim.incident_time}</dd>
           </div>
           <div className="flex gap-2">
             <dt className="w-14 shrink-0 text-ink-faint">피해</dt>
@@ -109,12 +109,12 @@ export default function CaseFileRail({ caseData }: CaseFileRailProps) {
               className="border-l-2 border-stamp/30 pl-2.5"
             >
               <div className="flex items-baseline gap-1.5">
-                <span className="font-type text-[10px] text-stamp">
+                <span className="font-type text-[0.625rem] text-stamp">
                   {String(i + 1).padStart(2, '0')}
                 </span>
-                <span className="text-[14px] font-bold">{e.name}</span>
+                <span className="text-[0.875rem] font-bold">{e.name}</span>
               </div>
-              <p className="mt-0.5 text-[13px] leading-[1.75] text-ink-soft">
+              <p className="mt-0.5 text-[0.8125rem] leading-[1.75] text-ink-soft">
                 {e.description}
               </p>
             </li>

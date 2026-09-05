@@ -10,7 +10,7 @@ import AssetPreloader from "./components/AssetPreloader";
 
 export const metadata: Metadata = {
   title: "오늘의 탐정",
-  description: "10분의 미스터리, 당신의 추리력을 시험하세요.",
+  description: "20분의 미스터리, 당신의 추리력을 시험하세요.",
 };
 
 /*

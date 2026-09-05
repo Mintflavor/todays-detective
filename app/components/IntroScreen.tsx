@@ -42,7 +42,7 @@ export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }
               오늘의 <span className="text-amber-700">탐정</span>
             </h1>
             <p className="text-amber-500 font-serif text-lg tracking-widest font-bold mb-1">
-              10분의 미스터리
+              20분의 미스터리
             </p>
             <p className="text-gray-500 text-xs tracking-[0.3em] uppercase border-y border-gray-700 py-2">
               The Daily Detective
@@ -68,7 +68,7 @@ export default function IntroScreen({ onStart, onLoadGame, isMuted, toggleMute }
       </div>
       
       {/* Copyright Footer */}
-      <footer className="absolute bottom-4 w-full text-center text-[10px] text-gray-500/50 font-mono z-10">
+      <footer className="absolute bottom-4 w-full text-center text-[0.625rem] text-gray-500/50 font-mono z-10">
         <p>&copy; 2025-2026 Hyunil Park. All Rights Reserved.</p>
       </footer>
     </div>

@@ -13,8 +13,26 @@ import useGameTimer from './useGameTimer';
 import useGeminiClient from './useGeminiClient';
 import usePhaseHistory from './usePhaseHistory';
 
-const INITIAL_AP = 20;
-const TOTAL_SECONDS = 600;
+/**
+ * 심문 횟수는 **용의자 1명당** 이만큼이다 (공유 풀이 아니다).
+ *
+ * 예전에는 20을 셋이 나눠 썼다. 한 명에게 다 쓰면 나머지 둘은 아예 만나지
+ * 못했고, 그건 플레이어의 선택이 아니라 규칙이 만든 데드엔드였다.
+ * 이제 각자의 몫이 있으므로 "누구에게 쓸까"가 아니라 "무엇을 물을까"가 문제다.
+ *
+ * 총량은 3명 x 20 = 60회. 20분 안에 다 쓰는 것은 사실상 불가능하므로
+ * 실질적인 제약은 시간이고, AP는 한 명을 붙잡고 늘어지는 것만 막는다.
+ *
+ * 이 값을 올리면 심문 레이트 리밋(`RATE_LIMIT_CHAT`)도 같이 봐야 한다.
+ * 전역 시간당 한도라서, 한 판이 한도를 다 쓰면 다른 접속자가 429를 받는다.
+ */
+const AP_PER_SUSPECT = 20;
+
+/** 20분. 프롬프트의 시간 관리 채점 기준(server/app/prompts.py)과 반드시 일치해야 한다. */
+const TOTAL_SECONDS = 1200;
+
+/** 용의자 id -> 남은 심문 횟수. 수사 수첩(id 0)은 들어가지 않는다 (AP를 쓰지 않는다). */
+type ActionPoints = Record<number, number>;
 
 /** 튜토리얼을 본 적이 있는지. 기록실로 처음 들어온 사람도 규칙을 봐야 한다 (§5). */
 const TUTORIAL_SEEN_KEY = 'td_tutorial_seen';
@@ -44,7 +62,7 @@ export default function useGameEngine() {
   const [preloadedData, setPreloadedData] = useState<CaseData | null>(null);
   const [currentSuspectId, setCurrentSuspectId] = useState<number>(1); // 0 = Note(Self), 1~3 = Suspects
   const [chatLogs, setChatLogs] = useState<ChatLogs>({ 0: [], 1: [], 2: [], 3: [] });
-  const [actionPoints, setActionPoints] = useState<number>(INITIAL_AP);
+  const [actionPoints, setActionPoints] = useState<ActionPoints>({});
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
 
   // --- UI & Audio State ---
@@ -178,6 +196,14 @@ export default function useGameEngine() {
       logs[s.id] = [initialMsg];
     }
     setChatLogs(logs);
+
+    // chatLogs와 같은 이유로 id를 가정하지 않는다 — 실제 id마다 몫을 만든다.
+    const ap: ActionPoints = {};
+    for (const s of prepared.suspects) {
+      ap[s.id] = AP_PER_SUSPECT;
+    }
+    setActionPoints(ap);
+
     setCurrentSuspectId(prepared.suspects[0]?.id ?? 1);
   }, []);
 
@@ -317,7 +343,8 @@ export default function useGameEngine() {
       return;
     }
 
-    if (actionPoints <= 0) return;
+    // 현재 용의자의 몫만 본다. 다른 용의자가 소진됐어도 이쪽은 계속 물을 수 있다.
+    if ((actionPoints[currentSuspectId] ?? 0) <= 0) return;
     const suspect = caseData.suspects.find(s => s.id === currentSuspectId);
     if (!suspect) return;
 
@@ -334,7 +361,10 @@ export default function useGameEngine() {
       [currentSuspectId]: [...(prev[currentSuspectId] ?? []), { role: 'user', text }]
     }));
     setUserInput("");
-    setActionPoints(prev => prev - 1);
+    setActionPoints(prev => ({
+      ...prev,
+      [currentSuspectId]: (prev[currentSuspectId] ?? 0) - 1,
+    }));
 
     void runInterrogation(text, suspect.id, history);
   }, [userInput, isTyping, caseData, currentSuspectId, actionPoints, chatLogs, runInterrogation]);
@@ -394,7 +424,7 @@ export default function useGameEngine() {
     setPreloadedData(null);
     setEvaluation(null);
     setChatLogs({ 0: [], 1: [], 2: [], 3: [] });
-    setActionPoints(INITIAL_AP);
+    setActionPoints({});
     setCurrentSuspectId(1);
     setDeductionInput({ culpritId: null, reasoning: "" });
     setUserInput("");
@@ -454,8 +484,12 @@ export default function useGameEngine() {
     caseData,
     currentSuspectId, setCurrentSuspectId,
     chatLogs,
+    // 심문 화면은 용의자별 잔량이 필요하고(탭마다 표시),
+    // 추리 화면은 전체 소진 정도만 보여준다. 두 형태를 모두 내보낸다.
     actionPoints,
-    totalActionPoints: INITIAL_AP,
+    totalActionPoints: AP_PER_SUSPECT,
+    apRemainingTotal: Object.values(actionPoints).reduce((a, b) => a + b, 0),
+    apGrandTotal: Object.keys(actionPoints).length * AP_PER_SUSPECT,
     evaluation,
     userInput, setUserInput,
     isTyping,

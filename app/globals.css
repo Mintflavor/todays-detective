@@ -72,6 +72,30 @@
   color-scheme: dark;
 }
 
+/*
+ * 큰 화면에서 루트 글자 크기를 올린다 = 브라우저 확대와 같은 효과.
+ *
+ * QHD(2560px) 100%에서는 14px 본문이 너무 작아 브라우저를 125%로 확대해야
+ * 플레이할 수 있었다. 확대를 사용자에게 맡기면 조서 폭(rem 기준)까지 같이 커져
+ * 레이아웃이 어긋나므로, 화면 폭을 기준으로 우리가 정한다.
+ *
+ * 이게 성립하려면 **치수가 rem이어야 한다.** 심문 화면의 글자·상자 치수는 원래
+ * px로 박혀 있어서 루트 크기를 올려도 따라오지 않았다 (101곳을 rem으로 바꿨다).
+ * 테두리·모서리·1~4px 간격은 px로 남겼다 — 확대하면 헤어라인이 뭉개진다.
+ *
+ * dvh는 rem이 아니라 뷰포트 기준이므로 `h-[100dvh]`는 영향을 받지 않는다.
+ * 그래서 화면이 넘치지 않는다 (CSS `zoom`을 썼다면 이 부분이 깨진다).
+ */
+@media (min-width: 1728px) {
+  :root { font-size: 18px; }    /* FHD 이상 — 약 1.125배 */
+}
+@media (min-width: 2200px) {
+  :root { font-size: 20px; }    /* QHD — 약 1.25배 */
+}
+@media (min-width: 3000px) {
+  :root { font-size: 23px; }    /* 4K */
+}
+
 body {
   background: var(--background);
   color: var(--foreground);

@@ -261,9 +261,9 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             currentSuspectId={mockCurrentSuspectId}
             setCurrentSuspectId={setMockCurrentSuspectId}
             chatLogs={mockChatLogs}
-            actionPoints={5}
+            actionPoints={{ 1: 14, 2: 5, 3: 0 }}
             totalActionPoints={20}
-            timerSeconds={600}
+            timerSeconds={1200}
             isOverTime={false}
             showTimeOverModal={false}
             closeTimeOverModal={() => {}}
@@ -287,10 +287,10 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             setDeductionInput={setMockDeductionInput} 
             onSubmit={() => alert("Submit Deduction")}
             onBack={() => setTestScreen('NONE')}
-            timerSeconds={600}
+            timerSeconds={1200}
             isOverTime={false}
-            actionPoints={5}
-            totalActionPoints={20}
+            actionPoints={19}
+            totalActionPoints={60}
           />
         ) : null;
       case 'RESOLUTION':
@@ -345,7 +345,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                 <h2 className="font-mono font-bold text-xl md:text-2xl tracking-widest uppercase text-gray-200">
                   제한 구역
                 </h2>
-                <p className="text-[10px] text-red-400/60 uppercase tracking-widest">Authorized Personnel Only</p>
+                <p className="text-[0.625rem] text-red-400/60 uppercase tracking-widest">Authorized Personnel Only</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -373,7 +373,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
           <div className="flex gap-2 items-center bg-black/40 p-2 rounded border border-red-900/30">
             <button
               onClick={() => setActiveTab('SCENARIOS')}
-              className={`px-3 py-1 text-[11px] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
+              className={`px-3 py-1 text-[0.6875rem] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
                 ${activeTab === 'SCENARIOS'
                   ? 'bg-red-900/40 text-red-300 border-red-700'
                   : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-gray-200'}
@@ -383,7 +383,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
             </button>
             <button
               onClick={() => setActiveTab('FEEDBACKS')}
-              className={`px-3 py-1 text-[11px] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
+              className={`px-3 py-1 text-[0.6875rem] uppercase font-bold rounded-sm border transition-colors flex items-center gap-1.5
                 ${activeTab === 'FEEDBACKS'
                   ? 'bg-red-900/40 text-red-300 border-red-700'
                   : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-gray-200'}
@@ -410,7 +410,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                 <button
                   key={btn.type}
                   onClick={() => prepareTestData(btn.type as TestScreenType)}
-                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[10px] uppercase font-bold rounded-sm border border-gray-600 transition-colors"
+                  className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-[0.625rem] uppercase font-bold rounded-sm border border-gray-600 transition-colors"
                 >
                   {btn.label}
                 </button>
@@ -453,12 +453,12 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-center gap-2 flex-wrap min-w-0">
                             {fb.grade && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider bg-amber-950/40 text-amber-400 border border-amber-900/40">
+                              <span className="text-[0.625rem] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider bg-amber-950/40 text-amber-400 border border-amber-900/40">
                                 등급 {fb.grade}
                               </span>
                             )}
                             {gr && typeof gr.isCorrect === 'boolean' && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border
+                              <span className={`text-[0.625rem] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider border
                                 ${gr.isCorrect
                                   ? 'bg-emerald-950/40 text-emerald-400 border-emerald-900/40'
                                   : 'bg-red-950/40 text-red-400 border-red-900/40'}
@@ -486,7 +486,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                               {gr?.scenarioTitle || '제목 정보 없음'}
                             </span>
                             {fb.scenario_id && (
-                              <span className="text-[10px] text-gray-600 font-mono">
+                              <span className="text-[0.625rem] text-gray-600 font-mono">
                                 #{fb.scenario_id}
                               </span>
                             )}
@@ -500,7 +500,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                         {hasDetail && (
                           <button
                             onClick={() => setExpandedFeedbackId(isExpanded ? null : fb._id)}
-                            className="mt-3 text-[10px] font-mono uppercase tracking-widest text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
+                            className="mt-3 text-[0.625rem] font-mono uppercase tracking-widest text-gray-500 hover:text-gray-300 flex items-center gap-1 transition-colors"
                           >
                             {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                             {isExpanded ? '게임 결과 숨기기' : '게임 결과 보기'}
@@ -598,7 +598,7 @@ export default function AdminScreen({ onExit }: AdminScreenProps) {
                   >
                     <div className="flex-grow min-w-0 pr-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider
+                        <span className={`text-[0.625rem] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider
                           ${scenario.crime_type === '살인' ? 'bg-red-950 text-red-400' : 'bg-gray-700 text-gray-300'}
                         `}>
                           {scenario.crime_type}

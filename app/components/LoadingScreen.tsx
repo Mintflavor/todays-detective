@@ -79,7 +79,7 @@ export default function LoadingScreen({ loadingText, onCancel }: LoadingScreenPr
           </p>
           <button
             onClick={onCancel}
-            className="min-h-[48px] px-6 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 rounded-sm font-sans text-sm font-bold flex items-center gap-2 transition-colors"
+            className="min-h-[3rem] px-6 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 rounded-sm font-sans text-sm font-bold flex items-center gap-2 transition-colors"
           >
             <ChevronLeft size={16} /> 처음으로 돌아가기
           </button>

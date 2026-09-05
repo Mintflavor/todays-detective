@@ -51,7 +51,7 @@ export default function ErrorModal({
                 dismiss();
                 onRetry();
               }}
-              className="w-full min-h-[48px] bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[3rem] bg-red-700 hover:bg-red-600 text-white font-bold py-3 rounded-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2"
             >
               <RefreshCw size={18} /> 재접속 시도
             </button>
@@ -63,7 +63,7 @@ export default function ErrorModal({
                 dismiss();
                 onSecondary();
               }}
-              className="w-full min-h-[48px] bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-3 rounded-sm tracking-wider transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[3rem] bg-amber-800 hover:bg-amber-700 text-amber-100 font-bold py-3 rounded-sm tracking-wider transition-all flex items-center justify-center gap-2"
             >
               <Archive size={18} /> {secondaryLabel}
             </button>
@@ -71,7 +71,7 @@ export default function ErrorModal({
 
           <button
             onClick={dismiss}
-            className="w-full min-h-[48px] bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold py-3 rounded-sm tracking-wider transition-all flex items-center justify-center gap-2"
+            className="w-full min-h-[3rem] bg-gray-700 hover:bg-gray-600 text-gray-200 font-bold py-3 rounded-sm tracking-wider transition-all flex items-center justify-center gap-2"
           >
             <X size={18} /> 닫기
           </button>

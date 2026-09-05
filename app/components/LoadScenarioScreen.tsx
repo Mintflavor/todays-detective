@@ -67,7 +67,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
        <div className="absolute inset-0 z-0 opacity-50" style={{backgroundImage: 'radial-gradient(#222 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
 
       <header className="w-full max-w-4xl flex items-center justify-between mb-8 z-10 border-b border-gray-700 pb-4">
-        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-amber-500 transition-colors min-h-[44px] pr-2">
+        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-amber-500 transition-colors min-h-[2.75rem] pr-2">
           <ArrowLeft size={20} /> 뒤로가기
         </button>
         <h1 className="text-2xl font-bold text-amber-600 tracking-widest uppercase">수사 자료실</h1>
@@ -135,7 +135,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
                   </div>
                   <p className="text-sm text-gray-400 line-clamp-2 pl-6">{scenario.summary}</p>
                   <div className="mt-3 pl-6">
-                    <span className={`text-[10px] px-2 py-1 rounded border uppercase tracking-wider
+                    <span className={`text-[0.625rem] px-2 py-1 rounded border uppercase tracking-wider
                         ${scenario.crime_type === '살인' ? 'bg-red-950/50 border-red-900 text-red-400' : 'bg-gray-900 border-gray-700 text-gray-500'}
                     `}>
                       {scenario.crime_type}
@@ -153,7 +153,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
         <button
           onClick={() => setPage(p => Math.max(1, p - 1))}
           disabled={page === 1 || loading || !!openingId}
-          className="px-4 min-h-[44px] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
+          className="px-4 min-h-[2.75rem] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
         >
           <ChevronLeft size={16} /> 이전 페이지
         </button>
@@ -161,7 +161,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
         <button
           onClick={() => setPage(p => p + 1)}
           disabled={scenarios.length < 10 || loading || !!openingId}
-          className="px-4 min-h-[44px] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
+          className="px-4 min-h-[2.75rem] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
         >
           다음 페이지 <ChevronRight size={16} />
         </button>

@@ -61,14 +61,19 @@ class Settings(BaseSettings):
     # ⚠️ 아래 제한은 모두 **전역**이다. Next rewrite 프록시가 X-Forwarded-For를 전달하지 않아
     #    per-IP 구분이 불가능하다 (실측 확인). 상세는 app/ratelimit.py 참조.
     #
-    # 예산 상한의 본체:
-    #   25/month x 171원 = 약 4,275원 (월 5,000원의 85%). 나머지는 기록 재생용으로 남긴다.
-    #   3/day  = 하루 최대 약 477원. 하루에 한 달치를 태우는 것을 막는다.
-    #   2/hour = 순간 폭주 차단.
-    rate_limit_start_global: str = "2/hour;3/day;25/month"
-    # 아래 둘은 비용이 미미하므로 남용 방어 수준. 한 판 최대 20 AP = 심문 20회.
-    rate_limit_chat: str = "60/hour"
-    rate_limit_evaluate: str = "15/hour"
+    # 기준은 **하루 세 판을 여유롭게**다 (개발용 키라 월 5,000원 한도에 맞추지 않는다).
+    #   8/day   = 세 판 + 생성 실패·다시 하기 여유. 3/day이면 한 번 실패하면 그날 세 판을 못 채운다.
+    #   5/hour  = 한 판이 20분이라 한 시간에 세 판이 가능하다. 그보다 조금 넉넉하게.
+    #   150/month = 하루 다섯 판 평균. 순간 폭주는 시간/일 한도가 막는다.
+    rate_limit_start_global: str = "5/hour;8/day;150/month"
+    #
+    # 심문은 한 판이 용의자별 20회 x 3명 = **최대 60회**다.
+    # 세 판을 연달아 하면 한 시간에 180회가 되므로 그보다 넉넉해야 한다 —
+    # 한 판이 전역 한도를 다 쓰면 다른 접속자가 **수사 중에** 429를 받는다.
+    # 월/일 한도를 걸지 않는 이유: 수사 중에 끊기면 그 판이 통째로 버려진다.
+    rate_limit_chat: str = "300/hour"
+    # 세 판이면 3회. 추리를 고쳐 다시 내는 경우까지 감안한다.
+    rate_limit_evaluate: str = "20/hour"
     # 관리자 로그인 무차별 대입 방어
     rate_limit_admin_login: str = "30/hour"
     # 비우면 메모리 저장소를 쓴다 — 재시작 시 카운터가 초기화되어 월 상한이 무의미해진다.

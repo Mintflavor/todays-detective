@@ -60,7 +60,7 @@ export default function DeductionScreen({
           <h2 className="text-2xl font-bold text-white tracking-widest uppercase">
             최종 수사 보고
           </h2>
-          <p className="text-gray-500 text-[10px] mt-2 uppercase tracking-wide">범인을 지목하고 사건의 진실을 밝히세요</p>
+          <p className="text-gray-500 text-[0.625rem] mt-2 uppercase tracking-wide">범인을 지목하고 사건의 진실을 밝히세요</p>
         </div>
 
         {/* 남은 자원. 여기서 시간 초과 여부가 등급 상한을 결정하는데
@@ -74,7 +74,7 @@ export default function DeductionScreen({
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold font-mono bg-gray-900 text-amber-500 border border-amber-900">
             <Zap size={12} /> <span>{actionPoints} / {totalActionPoints}</span>
           </div>
-          <span className="text-[10px] text-gray-500 font-sans w-full text-center mt-1">
+          <span className="text-[0.625rem] text-gray-500 font-sans w-full text-center mt-1">
             이 화면에서는 시간이 흐르지 않습니다
           </span>
         </div>
@@ -115,7 +115,7 @@ export default function DeductionScreen({
                   )}
                 </div>
                 <div className="font-bold text-xs truncate">{s.name}</div>
-                <div className="text-[10px] text-gray-400 truncate mt-1">{s.role}</div>
+                <div className="text-[0.625rem] text-gray-400 truncate mt-1">{s.role}</div>
               </button>
             ))}
           </div>
@@ -129,10 +129,10 @@ export default function DeductionScreen({
             value={deductionInput.reasoning}
             onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setDeductionInput(prev => ({ ...prev, reasoning: e.target.value }))}
             placeholder="누가, 왜, 어떻게 범행했는지 서술하세요. 세 가지를 모두 밝혀야 최고 등급을 받습니다."
-            className="w-full min-h-[180px] max-h-[50vh] bg-gray-900 border border-gray-700 rounded-sm p-3 text-white focus:border-red-600 focus:outline-none resize-y font-sans leading-relaxed text-base placeholder-gray-600"
+            className="w-full min-h-[11.25rem] max-h-[50vh] bg-gray-900 border border-gray-700 rounded-sm p-3 text-white focus:border-red-600 focus:outline-none resize-y font-sans leading-relaxed text-base placeholder-gray-600"
           />
           {tooShort && deductionInput.reasoning.length > 0 && (
-            <p className="text-[10px] text-amber-600 font-sans">
+            <p className="text-[0.625rem] text-amber-600 font-sans">
               너무 짧습니다. 동기와 트릭을 함께 적으면 등급이 올라갑니다.
             </p>
           )}
@@ -141,14 +141,14 @@ export default function DeductionScreen({
         <div className="flex gap-3">
           <button
             onClick={onBack}
-            className="flex-1 min-h-[48px] bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-4 rounded-sm transition-colors text-xs flex items-center justify-center gap-1"
+            className="flex-1 min-h-[3rem] bg-gray-700 hover:bg-gray-600 text-gray-300 font-bold py-4 rounded-sm transition-colors text-xs flex items-center justify-center gap-1"
           >
             <ChevronLeft size={14} /> 수사 계속하기
           </button>
           <button
             onClick={onSubmit}
             disabled={!deductionInput.culpritId || !deductionInput.reasoning.trim()}
-            className="flex-[2] min-h-[48px] bg-red-800 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-4 rounded-sm shadow-xl text-sm tracking-widest transition-all"
+            className="flex-[2] min-h-[3rem] bg-red-800 hover:bg-red-700 disabled:bg-gray-800 disabled:text-gray-600 text-white font-bold py-4 rounded-sm shadow-xl text-sm tracking-widest transition-all"
           >
             제출
           </button>

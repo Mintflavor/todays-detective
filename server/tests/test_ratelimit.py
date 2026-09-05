@@ -86,12 +86,25 @@ class TestLimitStrings:
         )
 
     def test_monthly_cap_within_budget(self):
-        """월 5,000원 한도. 신규 한 판 약 171원이므로 29판이 상한이다."""
+        """월 지출 상한을 지킨다.
+
+        예전 기준은 월 5,000원(29판)이었다. 개발용 키를 쓰기로 하면서 기준을
+        **하루 세 판을 여유롭게**로 바꿨고(2026-08-26), 그에 맞춰 상한을 올렸다.
+
+        이 테스트를 지우지 말 것. 숫자는 바뀌었어도 **실수로 리밋을 한 자리
+        더 올리는 것**을 막는 유일한 장치다. 신규 한 판이 최대 205원
+        (사건 생성 159원 + 심문 60회 41원 + 평가 5원)이고, 초상화 3장이
+        생성 비용의 93%라 조일 곳은 항상 여기다.
+        """
+        MONTHLY_CEILING_KRW = 35_000
+        PER_GAME_KRW = 205
+
         limits = parse_many(get_settings().rate_limit_start_global)
         monthly = next(l for l in limits if l.GRANULARITY.name == "month")
-        assert monthly.amount <= 29, (
-            "월 %d회 x 171원 = %d원 — 5,000원 한도를 넘는다"
-            % (monthly.amount, monthly.amount * 171)
+        assert monthly.amount * PER_GAME_KRW <= MONTHLY_CEILING_KRW, (
+            "월 %d회 x %d원 = %d원 — 상한 %d원을 넘는다"
+            % (monthly.amount, PER_GAME_KRW, monthly.amount * PER_GAME_KRW,
+               MONTHLY_CEILING_KRW)
         )
 
     def test_start_has_burst_guard(self):
