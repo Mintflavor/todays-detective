@@ -249,7 +249,7 @@ cache pool   : sdc1 단일 ZFS, 444G 중 443G 여유 (거의 미사용)
 
 | 용도 | 모델 | 지원 메서드 | 토큰 한도 |
 |---|---|---|---|
-| 사건 생성 | `gemini-3.6-flash` | `generateContent` 등 | in 1,048,576 / out 65,536 |
+| 사건 생성 | `gemini-3.8-flash` | `generateContent` 등 | in 1,048,576 / out 65,536 |
 | 용의자 심문 | `gemini-3.5-flash-lite` | `generateContent` 등 | in 1,048,576 / out 65,536 |
 | 초상화 | `gemini-3.1-flash-lite-image` | `generateContent` **만** | in 65,536 / out 65,536 |
 

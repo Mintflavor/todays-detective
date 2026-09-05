@@ -190,6 +190,7 @@ export default function TodaysDetective() {
           /* 추리 화면은 용의자별 잔량이 아니라 전체 소진 정도를 보여준다 */
           actionPoints={apRemainingTotal}
           totalActionPoints={apGrandTotal}
+          chatLogs={chatLogs}
         />
       )}
 

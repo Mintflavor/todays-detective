@@ -34,6 +34,8 @@ from ..models import (
     EvaluateResponse,
     FeedbackRequest,
     GameStartResponse,
+    QARequest,
+    QAResponse,
     game_result_to_db,
 )
 from ..prompts import (
@@ -41,6 +43,7 @@ from ..prompts import (
     generate_contradiction_check_prompt,
     generate_evaluation_prompt,
     generate_portrait_prompt,
+    generate_qa_prompt,
     generate_suspect_prompt,
 )
 from ..sanitize import find_culprit, sanitize_case_data
@@ -509,6 +512,20 @@ def evaluate(request: Request, req: EvaluateRequest) -> EvaluateResponse:
         truth=truth,
         culpritName=real_culprit_name,
     )
+
+
+# ─────────────────────────── 사건 질의응답 (Q&A) ───────────────────────────
+@router.post("/qa", response_model=QAResponse)
+@limiter.limit(_settings.rate_limit_chat, key_func=global_key)
+def ask_question(request: Request, req: QARequest) -> QAResponse:
+    doc = _load_scenario(req.scenarioId)
+    case_data = doc.get("case_data") or {}
+
+    prompt = generate_qa_prompt(case_data, req.question, req.history)
+    # 사건 해설 질의응답 모델: gemini-3.8-flash
+    answer = gemini.call_gemini(prompt, model_override="gemini-3.8-flash")
+
+    return QAResponse(answer=answer.strip())
 
 
 # ─────────────────────────── 피드백 ───────────────────────────

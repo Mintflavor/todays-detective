@@ -4,11 +4,15 @@
 // Author: Hyunil Park
 // Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle, Archive } from 'lucide-react';
+import {
+  FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull,
+  Microscope, MessageSquare, Send, CheckCircle, Archive, HelpCircle,
+  Sparkles, MessageCircleQuestion
+} from 'lucide-react';
 import { Evaluation, CaseData, DeductionInput } from '../types/game';
-import { submitFeedback } from '../lib/api';
+import { submitFeedback, askCaseQuestion, QAMessage } from '../lib/api';
 
 interface ResolutionScreenProps {
   evaluation: Evaluation;
@@ -21,6 +25,23 @@ interface ResolutionScreenProps {
 
 const FEEDBACK_MAX_LENGTH = 300;
 
+interface DisplayQAMessage {
+  role: 'user' | 'model';
+  text: string;
+}
+
+const INITIAL_QA_MESSAGE: DisplayQAMessage = {
+  role: 'model',
+  text: '수사를 마치느라 수고 많으셨습니다, 탐정님. 이번 사건의 진실, 범인의 트릭, 용의자들의 숨겨진 사연, 또는 현장에서 이상하다고 느끼셨던 부분에 대해 무엇이든 질문해 주십시오. 사건의 모든 기록을 바탕으로 명쾌하게 설명해 드리겠습니다.',
+};
+
+const PRESET_QUESTIONS = [
+  '💡 진범의 진짜 범행 동기는 무엇이었나요?',
+  '🔍 제가 놓친 핵심 단서나 트릭은 무엇인가요?',
+  '🕵️ 용의자들이 숨기고 있던 진짜 비밀은 무엇이었나요?',
+  '⏱️ 사건 당일의 실제 타임라인을 정리해 주세요.',
+];
+
 export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset, onGoToArchive }: ResolutionScreenProps) {
   const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
   const [showBriefing, setShowBriefing] = useState(false);
@@ -29,6 +50,20 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
   const [feedbackSending, setFeedbackSending] = useState(false);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+
+  // --- AI 질의응답 (Q&A) State ---
+  const [showQAModal, setShowQAModal] = useState(false);
+  const [qaMessages, setQaMessages] = useState<DisplayQAMessage[]>([INITIAL_QA_MESSAGE]);
+  const [qaInput, setQaInput] = useState('');
+  const [qaLoading, setQaLoading] = useState(false);
+  const [qaError, setQaError] = useState<string | null>(null);
+  const qaChatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showQAModal) {
+      qaChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [qaMessages, showQAModal]);
 
   const closeFeedbackModal = () => {
     if (feedbackSending) return;
@@ -75,6 +110,39 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
       setFeedbackError(err instanceof Error ? err.message : '피드백 전송에 실패했습니다.');
     } finally {
       setFeedbackSending(false);
+    }
+  };
+
+  const handleSendQA = async (questionToSend?: string) => {
+    const q = (questionToSend ?? qaInput).trim();
+    if (!q || qaLoading) return;
+
+    setQaError(null);
+    setQaLoading(true);
+    setQaInput('');
+
+    // 유저 메시지 추가
+    const newMessages: DisplayQAMessage[] = [...qaMessages, { role: 'user', text: q }];
+    setQaMessages(newMessages);
+
+    try {
+      // API 전달용 history 구성 (초기 환영 인사말 제외)
+      const historyPayload: QAMessage[] = newMessages.slice(1, -1).map(m => ({
+        role: m.role,
+        content: m.text,
+      }));
+
+      const answer = await askCaseQuestion({
+        scenarioId: caseData.scenarioId ?? '',
+        question: q,
+        history: historyPayload,
+      });
+
+      setQaMessages(prev => [...prev, { role: 'model', text: answer }]);
+    } catch (err) {
+      setQaError(err instanceof Error ? err.message : '답변을 불러오지 못했습니다.');
+    } finally {
+      setQaLoading(false);
     }
   };
 
@@ -174,6 +242,18 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
 
             {/* Actions */}
             <div className="flex flex-col gap-3">
+              {/* AI 사건 질의응답 버튼 */}
+              <button
+                onClick={() => setShowQAModal(true)}
+                className="w-full py-3.5 bg-amber-950/40 hover:bg-amber-900/50 border-2 border-amber-600/80 text-amber-300 rounded-sm flex items-center justify-center gap-2.5 transition-all text-sm font-bold shadow-lg group"
+              >
+                <MessageCircleQuestion size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>수석 분석관에게 사건 의문점 질문하기 (AI Q&A)</span>
+                <span className="text-[0.625rem] bg-amber-600 text-gray-950 px-1.5 py-0.5 rounded font-mono font-black">
+                  AI
+                </span>
+              </button>
+
               {/* Briefing Button */}
               <button 
                 onClick={() => setShowBriefing(true)}
@@ -209,10 +289,16 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-center items-stretch md:items-center gap-3 pt-8 border-t border-gray-700">
-            <button
+        <div className="flex flex-col md:flex-row justify-center items-stretch md:items-center gap-3 pt-8 border-t border-gray-700 flex-wrap">
+          <button
+            onClick={() => setShowQAModal(true)}
+            className="w-full md:w-auto bg-amber-950/60 hover:bg-amber-900/60 text-amber-300 py-4 px-8 rounded-sm font-bold shadow-lg border-2 border-amber-600/80 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
+          >
+            <MessageCircleQuestion size={22} className="text-amber-400" /> 의문점 질문하기
+          </button>
+          <button
             onClick={onReset}
-            className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-12 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
+            className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-10 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
           >
             <RefreshCw size={20} /> 새로운 사건 맡기
           </button>
@@ -421,6 +507,151 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ───────── AI 사건 심층 질의응답 모달 ───────── */}
+      {showQAModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-5 animate-fade-in">
+          <div className="w-full max-w-3xl bg-gray-900 border border-gray-700 rounded-sm shadow-2xl flex flex-col h-[88vh] max-h-[88vh] overflow-hidden text-gray-200">
+            {/* 모달 헤더 */}
+            <div className="bg-gray-800 px-5 py-3.5 border-b border-gray-700 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-amber-600/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <Sparkles size={16} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm tracking-wider text-white font-serif flex items-center gap-2">
+                    <span>사건 심층 질의응답</span>
+                    <span className="text-[0.625rem] px-2 py-0.5 rounded bg-gray-950 text-amber-400 border border-amber-700/60 font-mono">
+                      gemini-3.8-flash
+                    </span>
+                  </h3>
+                  <p className="text-[0.6875rem] text-gray-400 font-sans">
+                    사건의 모든 내막을 알고 있는 수석 사건 분석관실
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQAModal(false)}
+                className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 추천 질문 칩 영역 (빠른 질문) */}
+            <div className="bg-gray-950/80 px-4 py-2.5 border-b border-gray-800 shrink-0 overflow-x-auto flex gap-2 no-scrollbar">
+              <span className="text-[0.625rem] font-bold text-gray-500 uppercase tracking-wider py-1 shrink-0 flex items-center gap-1 font-mono">
+                <HelpCircle size={12} /> 추천 질문:
+              </span>
+              {PRESET_QUESTIONS.map((pq, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  disabled={qaLoading}
+                  onClick={() => handleSendQA(pq.replace(/^[^\s]+\s/, ''))}
+                  className="text-xs bg-gray-800/80 hover:bg-gray-700 text-gray-300 hover:text-amber-300 px-3 py-1 rounded-full border border-gray-700 transition-all shrink-0 disabled:opacity-50"
+                >
+                  {pq}
+                </button>
+              ))}
+            </div>
+
+            {/* 대화 스크롤 영역 */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 font-sans space-y-4 bg-gray-900/60">
+              {qaMessages.map((msg, idx) => {
+                const isUser = msg.role === 'user';
+                return (
+                  <div
+                    key={idx}
+                    className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
+                  >
+                    <div className="flex items-center gap-1.5 text-[0.6875rem] text-gray-400 mb-1 px-1">
+                      {isUser ? (
+                        <>
+                          <span className="font-bold text-amber-400">담당 탐정</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="font-bold text-amber-500 font-serif">수석 사건 분석관</span>
+                          <span className="text-[0.625rem] text-gray-500 font-mono">Chief Analyst</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div
+                      className={`max-w-[90%] sm:max-w-[82%] rounded-sm p-4 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap shadow-md ${
+                        isUser
+                          ? 'bg-amber-950/30 border border-amber-800/60 text-amber-100'
+                          : 'bg-[#f4ebd8] text-gray-900 border border-amber-900/20 font-serif'
+                      }`}
+                    >
+                      {msg.text}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* 로딩 인디케이터 */}
+              {qaLoading && (
+                <div className="flex flex-col items-start animate-fade-in">
+                  <div className="text-[0.6875rem] text-amber-500 font-bold mb-1 px-1 font-serif">
+                    수석 사건 분석관
+                  </div>
+                  <div className="bg-[#f4ebd8] text-gray-800 border border-amber-900/20 rounded-sm p-4 text-xs sm:text-sm flex items-center gap-3 font-serif shadow-md">
+                    <div className="w-4 h-4 border-2 border-amber-900 border-t-transparent rounded-full animate-spin shrink-0" />
+                    <span>수석 분석관이 사건 기록과 타임라인을 대조하고 있습니다...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 에러 메시지 */}
+              {qaError && (
+                <div className="p-3 bg-red-950/40 border border-red-900 text-red-300 text-xs rounded-sm flex items-center justify-between">
+                  <span>{qaError}</span>
+                  <button
+                    type="button"
+                    onClick={() => setQaError(null)}
+                    className="text-red-400 hover:text-red-200 underline text-[0.6875rem]"
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
+
+              <div ref={qaChatEndRef} />
+            </div>
+
+            {/* 모달 입력 폼 */}
+            <div className="bg-gray-800/95 p-3 sm:p-4 border-t border-gray-700 shrink-0">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendQA();
+                }}
+                className="flex items-center gap-2"
+              >
+                <input
+                  type="text"
+                  value={qaInput}
+                  onChange={(e) => setQaInput(e.target.value)}
+                  disabled={qaLoading}
+                  placeholder="사건에 대해 궁금한 점이나 의문점을 자유롭게 질문하세요... (예: 범인의 알리바이 트릭이 뭐였나요?)"
+                  className="flex-1 bg-gray-950 border border-gray-700 focus:border-amber-600 focus:outline-none text-white text-xs sm:text-sm px-3.5 py-3 rounded-sm font-sans placeholder-gray-500 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={qaLoading || !qaInput.trim()}
+                  className="px-5 py-3 bg-amber-800 hover:bg-amber-700 disabled:bg-gray-800 disabled:text-gray-600 text-amber-100 rounded-sm font-bold text-xs sm:text-sm transition-all flex items-center gap-1.5 shrink-0"
+                >
+                  <Send size={15} />
+                  <span>질문하기</span>
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       )}

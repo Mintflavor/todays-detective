@@ -632,3 +632,82 @@ def generate_contradiction_check_prompt(suspect, world, timeline, evidence, ques
 또는
 [CONTRADICTION: FALSE]
 """
+
+
+def generate_qa_prompt(case_data: dict, question: str, history: list = None) -> str:
+    """결과 화면에서 탐정(플레이어)이 사건의 의문점, 진실, 트릭 등에 대해 질문할 때 답변하는 프롬프트."""
+    world = case_data.get("world_setting") or {}
+    victim = case_data.get("victim_info") or {}
+    timeline = "\n   ".join(case_data.get("timeline_truth") or [])
+
+    evidence_items = []
+    for e in (case_data.get("evidence_list") or []):
+        if isinstance(e, dict):
+            evidence_items.append(f"- [일반 증거] {e.get('name', '')}: {e.get('description', '')}")
+    for he in (case_data.get("hidden_evidence_list") or []):
+        if isinstance(he, dict):
+            evidence_items.append(
+                f"- [숨겨진 증거] {he.get('name', '')}: {he.get('description', '')} "
+                f"(연관 용의자 ID: {he.get('target_suspect_id')})"
+            )
+    evidence_text = "\n".join(evidence_items) if evidence_items else "기록된 증거 없음"
+
+    suspect_items = []
+    for s in (case_data.get("suspects") or []):
+        if isinstance(s, dict):
+            is_culprit = "★ 진범" if s.get("isCulprit") else "용의자"
+            suspect_items.append(
+                f"[{is_culprit}] {s.get('name')}({s.get('role', '')})\n"
+                f"  - 피해자와의 관계: {s.get('relationship_to_victim', '')}\n"
+                f"  - 주장 알리바이: {s.get('alibi_claim', '')}\n"
+                f"  - 실제 행적: {s.get('real_action', '')}\n"
+                f"  - 숨긴 비밀: {s.get('secret', '')}"
+            )
+    suspects_text = "\n\n".join(suspect_items) if suspect_items else "기록된 용의자 없음"
+
+    history_lines = []
+    for h in (history or []):
+        role_val = getattr(h, "role", "") if hasattr(h, "role") else (h.get("role", "") if isinstance(h, dict) else "")
+        role_label = "탐정" if role_val == "user" else "분석관"
+        content = getattr(h, "content", "") if hasattr(h, "content") else (h.get("content", "") if isinstance(h, dict) else "")
+        if content:
+            history_lines.append(f"{role_label}: {content}")
+    history_text = "\n".join(history_lines) if history_lines else "(이전 대화 없음)"
+
+    return f"""당신은 이 사건을 총괄 지휘하고 모든 진실을 꿰뚫어보고 있는 '수석 사건 분석관(Chief Case Analyst)'입니다.
+사건 수사를 마친 플레이어(탐정)가 결과 보고서를 확인한 뒤, 사건에 대해 품고 있던 의문점, 이상하다고 느낀 점, 놓친 트릭이나 복선, 용의자들의 진짜 의도에 대해 당신에게 묻고 있습니다.
+
+아래의 [사건의 전말과 모든 객관적 진실]을 바탕으로 탐정의 질문에 명쾌하고 지적이며 깊이 있는 답변을 제공하세요.
+
+[사건의 전말과 모든 객관적 진실]
+1. 사건명: {case_data.get("title", "미상 사건")}
+2. 사건 개요: {case_data.get("summary", "")}
+3. 범죄 유형: {case_data.get("crime_type", "")}
+4. 무대 및 환경: {world.get("location", "")} / {world.get("weather", "")}
+5. 피해자 정보: {victim.get("name", "")} / 발생 시각: {victim.get("incident_time", "")} / 피해 내용: {victim.get("damage_details", "")} / 현장 상태: {victim.get("body_condition", "")}
+6. 사건의 진실 및 트릭 해설 (Solution):
+{case_data.get("solution", "")}
+
+7. 실제 사건 타임라인 (Timeline Truth):
+   {timeline}
+
+8. 용의자들의 진짜 정보 및 비밀:
+{suspects_text}
+
+9. 현장 증거물 및 숨겨진 증거 목록:
+{evidence_text}
+
+[이전 질의응답 내역]
+{history_text}
+
+[탐정의 새로운 질문]
+"{question}"
+
+[답변 가이드라인 및 페르소나 지침]
+1. **페르소나**: 베테랑 수석 사건 분석관으로서, 냉철하고 예리하면서도 동료 탐정을 존중하는 신사적이고 지적인 태도를 유지하세요.
+2. **어조**: 항상 정중하고 예의 바른 존댓말(~했습니다, ~입니다)을 사용하세요.
+3. **진실 기반**: 위 [사건의 전말과 모든 객관적 진실]에 기록된 사실과 완벽하게 일치하게 설명하세요.
+   - 탐정이 "왜 범인은 알리바이를 거짓으로 꾸몄나요?", "현장의 깨진 유리는 무엇인가요?", "용의자의 수상한 행동은 뭐였나요?" 등을 물어보면, 사건의 인과관계와 심리, 물리적 증거의 의미를 속 시원하게 풀어주세요.
+   - 기록에 직접 명시되지 않은 사소한 디테일에 대해 묻는다면, 사건의 전말과 논리적 모순이 생기지 않도록 합리적인 개연성을 갖추어 설명하세요.
+4. **분량 및 구성**: 2~4단락 내외로 명확하고 흥미진진하게 서술하세요. 불필요한 서두나 잡담은 줄이고 핵심적인 추리적 통찰을 제공하세요.
+"""

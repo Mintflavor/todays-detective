@@ -267,7 +267,7 @@ api. Next 기본값 때문에 성공 응답이 500이 된 적이 있다 (계획 
 ```
 MONGODB_URL              # SCRAM 접속 (앱 전용 계정 detective)
 GEMINI_API_KEY
-GEMINI_MODEL             # gemini-3.6-flash        (사건 생성·평가)
+GEMINI_MODEL             # gemini-3.8-flash        (사건 생성·평가·Q&A)
 GEMINI_CHAT_MODEL        # gemini-3.5-flash-lite   (심문)
 IMAGE_MODEL              # gemini-3.1-flash-lite-image (초상화, Imagen 아님)
 S3_ENDPOINT_URL          # http://todays-detective-minio:9000

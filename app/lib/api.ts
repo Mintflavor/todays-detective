@@ -125,3 +125,30 @@ export async function deleteFeedback(id: string): Promise<void> {
   }
 }
 
+export interface QAMessage {
+  role: 'user' | 'model' | 'assistant';
+  content: string;
+}
+
+export interface AskQuestionPayload {
+  scenarioId: string;
+  question: string;
+  history?: QAMessage[];
+}
+
+export async function askCaseQuestion(payload: AskQuestionPayload): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/api/game/qa`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error(errorMessage(await readJson(response), '수석 분석관과의 통신에 실패했습니다.'));
+  }
+
+  const data = await response.json();
+  return data.answer;
+}
+
+

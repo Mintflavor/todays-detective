@@ -880,12 +880,22 @@ export default function InvestigationScreen({
               </div>
             </div>
 
-            <div className="border-t border-ink/15 bg-paper-2/70 p-4">
+            <div className="border-t border-ink/15 bg-paper-2/70 p-4 flex flex-col sm:flex-row gap-3">
               <button
                 onClick={closeTimeOverModal}
-                className="td-stamp min-h-[3rem] w-full rounded-[2px] bg-paper/60 font-dossier text-sm font-bold tracking-[0.18em] transition-transform active:scale-[0.98]"
+                className="td-stamp min-h-[3rem] flex-1 rounded-[2px] bg-paper/60 font-dossier text-sm font-bold tracking-[0.14em] transition-transform hover:bg-paper/90 active:scale-[0.98]"
               >
-                수신 확인
+                수사 계속하기
+              </button>
+              <button
+                onClick={() => {
+                  closeTimeOverModal();
+                  onGoToDeduction();
+                }}
+                className="min-h-[3rem] flex-1 rounded-[2px] border-2 border-stamp bg-stamp text-paper font-dossier text-sm font-bold tracking-[0.14em] transition-transform hover:bg-stamp/90 active:scale-[0.98] shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <Stamp size={16} />
+                범인 지목하기
               </button>
             </div>
           </div>

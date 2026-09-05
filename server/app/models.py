@@ -75,6 +75,31 @@ class EvaluateResponse(BaseModel):
     culpritName: str
 
 
+# ─────────────────────────── 사건 Q&A (진실 질의응답) ───────────────────────────
+class QAMessage(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    role: str  # "user" | "model" | "assistant"
+    content: str
+
+
+class QARequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    scenarioId: str
+    question: str
+    history: list[QAMessage] = Field(default_factory=list)
+
+    @field_validator("question")
+    @classmethod
+    def _question_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("question은 비어 있을 수 없습니다")
+        return v.strip()
+
+
+class QAResponse(BaseModel):
+    answer: str
+
+
 # ─────────────────────────── 피드백 ───────────────────────────
 # 클라이언트는 camelCase로 보내고, DB에는 snake_case로 저장한다.
 # Lambda의 _game_feedback / GET /feedbacks 매핑을 그대로 유지한다.

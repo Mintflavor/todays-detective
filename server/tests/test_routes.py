@@ -333,6 +333,49 @@ class TestScenarioSanitized:
         assert r.json()["detail"] == "Invalid scenario data"
 
 
+# ─────────────────────── POST /api/game/qa ───────────────────────
+class TestQA:
+    def test_answers_question_with_gemini(self, client, saved_scenario, monkeypatch):
+        called = {}
+
+        def mock_call(prompt, model_override=None):
+            called["prompt"] = prompt
+            called["model"] = model_override
+            return "이 사건의 범인은 알리바이를 조작하기 위해 시계를 10분 빠르게 맞추어 두었습니다."
+
+        monkeypatch.setattr(gemini, "call_gemini", mock_call)
+
+        r = client.post(
+            "/api/game/qa",
+            json={
+                "scenarioId": saved_scenario,
+                "question": "범인의 알리바이 트릭이 뭐였나요?",
+                "history": [
+                    {"role": "user", "content": "안녕하세요"},
+                    {"role": "model", "content": "네, 질문해 주세요."},
+                ],
+            },
+        )
+        assert r.status_code == 200
+        assert "시계를 10분 빠르게" in r.json()["answer"]
+        assert called["model"] == "gemini-3.8-flash"
+        assert "범인의 알리바이 트릭이 뭐였나요?" in called["prompt"]
+
+    def test_blank_question_422(self, client, saved_scenario):
+        r = client.post(
+            "/api/game/qa",
+            json={"scenarioId": saved_scenario, "question": "   "},
+        )
+        assert r.status_code == 422
+
+    def test_missing_scenario_404(self, client):
+        r = client.post(
+            "/api/game/qa",
+            json={"scenarioId": "0" * 24, "question": "질문입니다."},
+        )
+        assert r.status_code == 404
+
+
 # ─────────────────────── /scenarios CRUD ───────────────────────
 class TestScenariosCrud:
     def test_list_excludes_case_data(self, client, saved_scenario):

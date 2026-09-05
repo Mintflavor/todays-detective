@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # ── Gemini ───────────────────────────────────────────────
     gemini_api_key: str
-    gemini_model: str = "gemini-3.6-flash"
+    gemini_model: str = "gemini-3.8-flash"
     gemini_chat_model: str = ""  # 비면 gemini_model로 폴백 (Lambda 동작과 동일)
     # 더 이상 Imagen이 아니다 — Gemini 이미지 모델이다. (§0-F)
     image_model: str = "gemini-3.1-flash-lite-image"
