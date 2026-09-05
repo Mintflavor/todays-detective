@@ -150,3 +150,4 @@ class TestChatEndpointContradiction:
         data = r.json()
         assert data["reply"] == "저는 주방에 있었습니다."
         assert data["isContradiction"] is True
+

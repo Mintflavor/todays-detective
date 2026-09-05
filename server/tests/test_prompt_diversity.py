@@ -90,7 +90,17 @@ class TestSchemaExampleIsUnbiased:
                 "isCulprit 예시가 boolean이 아니다: %r" % value
             )
 
-    @pytest.mark.parametrize("field", ["real_action", "alibi_claim", "secret", "image_prompt_keywords"])
+    @pytest.mark.parametrize(
+        "field",
+        [
+            "real_action",
+            "alibi_claim",
+            "secret",
+            "image_prompt_keywords",
+            "relationship_to_victim",
+            "relationships_to_others",
+        ],
+    )
     def test_slots_are_symmetric(self, field):
         """세 용의자 예시의 설명이 다르면 그 차이가 범인 힌트로 복사된다.
 

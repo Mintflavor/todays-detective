@@ -374,6 +374,8 @@ def chat(request: Request, req: ChatRequest) -> ChatResponse:
         case_data.get("world_setting") or {},
         case_data.get("timeline_truth") or [],
         case_data.get("evidence_list") or [],
+        all_suspects=case_data.get("suspects") or [],
+        victim_info=case_data.get("victim_info") or {},
     )
     # 프롬프트 조립 형태를 Lambda와 동일하게 유지한다.
     full_prompt = (
