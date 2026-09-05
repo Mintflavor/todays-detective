@@ -358,5 +358,35 @@ describe('심문 횟수는 용의자별로 따로다', () => {
       const evidenceList = result.current.caseData!.evidence_list;
       expect(evidenceList.some(e => e.name === '비밀 열쇠')).toBe(true);
     });
+
+    it('이미 존재하는 증거가 응답으로 내려와도 중복 등록되거나 중복 시스템 메시지가 남지 않는다', async () => {
+      interrogateSuspect.mockResolvedValue({
+        reply: '이미 아시는 증거입니다.',
+        isContradiction: false,
+        unlockedEvidence: { name: '현장 증거 1', description: '기존에 이미 있던 증거' },
+      });
+
+      const { result } = renderHook(() => useGameEngine());
+      const customCase = makeCase('사건');
+      customCase.evidence_list = [{ name: '현장 증거 1', description: '기존에 이미 있던 증거' }];
+      act(() => result.current.handleLoadGame(customCase));
+
+      const target = result.current.caseData!.suspects[0].id;
+      act(() => result.current.setCurrentSuspectId(target));
+
+      await act(async () => {
+        result.current.handleInputChange({ target: { value: '현장 증거 1에 대해 말해보세요.' } } as never);
+      });
+      await act(async () => {
+        result.current.handleSendMessage();
+      });
+
+      const logs = result.current.chatLogs[target]!;
+      // 0: 초기 정보, 1: 질문, 2: 답변 ('새로운 증거 확보' 시스템 메시지가 없어야 함)
+      expect(logs).toHaveLength(3);
+      expect(logs.some(l => l.role === 'system' && l.text.includes('새로운 증거 확보'))).toBe(false);
+      expect(result.current.caseData!.evidence_list).toHaveLength(1);
+      expect(result.current.newlyUnlockedEvidence).toBeNull();
+    });
   });
 });

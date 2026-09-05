@@ -427,17 +427,27 @@ def chat(request: Request, req: ChatRequest) -> ChatResponse:
     unlocked_match = _UNLOCKED_RE.search(reply)
     if unlocked_match:
         unlocked_name = unlocked_match.group(1).strip()
+        already_acquired_names = {
+            e.get("name")
+            for e in (case_data.get("evidence_list") or [])
+            if isinstance(e, dict) and e.get("name")
+        } | set(req.unlockedEvidenceNames or [])
+
         for he in case_data.get("hidden_evidence_list") or []:
-            if isinstance(he, dict) and (
-                he.get("name") == unlocked_name
-                or unlocked_name in he.get("name", "")
-                or he.get("name", "") in unlocked_name
-            ):
-                unlocked_evidence = {
-                    "name": he.get("name"),
-                    "description": he.get("description"),
-                }
-                break
+            if isinstance(he, dict):
+                he_name = he.get("name", "")
+                if (
+                    he_name == unlocked_name
+                    or unlocked_name in he_name
+                    or he_name in unlocked_name
+                ):
+                    # 이미 획득한 증거 목록에 없어야만 신규 해금으로 인정
+                    if he_name not in already_acquired_names and unlocked_name not in already_acquired_names:
+                        unlocked_evidence = {
+                            "name": he.get("name"),
+                            "description": he.get("description"),
+                        }
+                    break
         reply = _UNLOCKED_RE.sub("", reply).strip()
 
     # 모순 여부 판정 (1회 재시도 후 False 폴백)

@@ -113,3 +113,69 @@ class TestChatEndpointEvidenceUnlock:
             assert data["unlockedEvidence"] is not None
             assert data["unlockedEvidence"]["name"] == "숨겨진 열쇠"
             assert "화분 밑" in data["unlockedEvidence"]["description"]
+
+    def test_chat_ignores_already_unlocked_or_existing_evidence(self, client: TestClient):
+        scenario_id = str(ObjectId())
+        case_data = {
+            "title": "테스트 사건",
+            "evidence_list": [{"name": "초기 증거", "description": "설명"}],
+            "hidden_evidence_list": [
+                {
+                    "name": "숨겨진 열쇠",
+                    "description": "화분 밑에서 발견된 금색 열쇠",
+                    "target_suspect_id": 1,
+                    "trigger_condition": "초기 증거 제시",
+                }
+            ],
+            "suspects": [
+                {
+                    "id": 1,
+                    "name": "용의자A",
+                    "role": "비서",
+                    "isCulprit": False,
+                }
+            ],
+            "world_setting": {"location": "사무실", "weather": "맑음"},
+            "timeline_truth": [],
+            "solution": "진상",
+        }
+
+        # 1. 이미 unlockedEvidenceNames에 포함된 경우
+        with patch("app.routers.game._load_scenario", return_value={"case_data": case_data}), \
+             patch("app.routers.game.gemini.call_gemini", return_value="이미 말씀드렸습니다. [UNLOCKED: 숨겨진 열쇠]"), \
+             patch("app.routers.game.check_contradiction", return_value=False):
+
+            r = client.post(
+                "/api/game/chat",
+                json={
+                    "scenarioId": scenario_id,
+                    "suspectId": 1,
+                    "message": "열쇠에 대해 다시 말해보세요.",
+                    "unlockedEvidenceNames": ["숨겨진 열쇠"],
+                },
+            )
+
+            assert r.status_code == 200
+            data = r.json()
+            assert "[UNLOCKED:" not in data["reply"]
+            assert data["unlockedEvidence"] is None
+
+        # 2. 이미 초기 evidence_list에 존재하는 증거명인 경우
+        with patch("app.routers.game._load_scenario", return_value={"case_data": case_data}), \
+             patch("app.routers.game.gemini.call_gemini", return_value="초기 증거입니다. [UNLOCKED: 초기 증거]"), \
+             patch("app.routers.game.check_contradiction", return_value=False):
+
+            r = client.post(
+                "/api/game/chat",
+                json={
+                    "scenarioId": scenario_id,
+                    "suspectId": 1,
+                    "message": "초기 증거는요?",
+                    "unlockedEvidenceNames": [],
+                },
+            )
+
+            assert r.status_code == 200
+            data = r.json()
+            assert "[UNLOCKED:" not in data["reply"]
+            assert data["unlockedEvidence"] is None

@@ -309,9 +309,7 @@ export default function useGameEngine() {
     if (!caseData?.scenarioId) return;
     setIsTyping(true);
     try {
-      const unlockedNames = (caseData.evidence_list || [])
-        .filter(e => e.isUnlocked)
-        .map(e => e.name);
+      const unlockedNames = (caseData.evidence_list || []).map(e => e.name);
       const { reply, isContradiction, unlockedEvidence } = await interrogateSuspect(
         caseData.scenarioId,
         suspectId,
@@ -320,12 +318,18 @@ export default function useGameEngine() {
         presentedEvidenceName,
         unlockedNames
       );
+      const isAlreadyAcquired = Boolean(
+        unlockedEvidence &&
+        caseData.evidence_list.some(e => e.name === unlockedEvidence.name)
+      );
+      const isNewEvidence = Boolean(unlockedEvidence && !isAlreadyAcquired);
+
       setChatLogs(prev => {
         const nextList: ChatMessage[] = [...(prev[suspectId] ?? []), { role: 'ai', text: reply }];
         if (isContradiction) {
           nextList.push({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
         }
-        if (unlockedEvidence) {
+        if (isNewEvidence && unlockedEvidence) {
           nextList.push({
             role: 'system',
             text: `새로운 증거 확보: [${unlockedEvidence.name}] ${unlockedEvidence.description}`,
@@ -336,7 +340,7 @@ export default function useGameEngine() {
           [suspectId]: nextList,
         };
       });
-      if (unlockedEvidence) {
+      if (isNewEvidence && unlockedEvidence) {
         setCaseData(prev => {
           if (!prev) return prev;
           const alreadyExists = prev.evidence_list.some(e => e.name === unlockedEvidence.name);
