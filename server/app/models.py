@@ -30,6 +30,8 @@ class ChatRequest(BaseModel):
     suspectId: int
     message: str
     history: str = ""
+    presentedEvidenceName: Optional[str] = None
+    unlockedEvidenceNames: list[str] = Field(default_factory=list)
 
     @field_validator("message")
     @classmethod
@@ -42,12 +44,14 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
     isContradiction: bool = False
+    unlockedEvidence: Optional[dict[str, Any]] = None
 
 
 class DeductionData(BaseModel):
     culpritName: str
     reasoning: str
     isOverTime: bool = False
+    unlockedEvidenceNames: list[str] = Field(default_factory=list)
 
     @field_validator("culpritName", "reasoning")
     @classmethod

@@ -22,6 +22,8 @@ import { CaseData } from '../types/game';
 
 interface CaseFileRailProps {
   caseData: CaseData;
+  selectedEvidenceName?: string | null;
+  onPresentEvidence?: (evidenceName: string) => void;
 }
 
 /** 서류철 안의 한 절. 제목은 붉은 관인 색으로 찍는다. */
@@ -45,7 +47,11 @@ function Section({
   );
 }
 
-export default function CaseFileRail({ caseData }: CaseFileRailProps) {
+export default function CaseFileRail({
+  caseData,
+  selectedEvidenceName,
+  onPresentEvidence,
+}: CaseFileRailProps) {
   const { victim_info: victim, world_setting: world, evidence_list: evidence } = caseData;
 
   return (
@@ -103,22 +109,46 @@ export default function CaseFileRail({ caseData }: CaseFileRailProps) {
       */}
       <Section icon={<Package size={11} />} label={`압수 증거 ${evidence.length}건`}>
         <ol className="space-y-2.5">
-          {evidence.map((e, i) => (
-            <li
-              key={`${e.name}-${i}`}
-              className="border-l-2 border-stamp/30 pl-2.5"
-            >
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-type text-[0.625rem] text-stamp">
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span className="text-[0.875rem] font-bold">{e.name}</span>
-              </div>
-              <p className="mt-0.5 text-[0.8125rem] leading-[1.75] text-ink-soft">
-                {e.description}
-              </p>
-            </li>
-          ))}
+          {evidence.map((e, i) => {
+            const isSelected = selectedEvidenceName === e.name;
+            return (
+              <li
+                key={`${e.name}-${i}`}
+                className="border-l-2 border-stamp/30 pl-2.5"
+              >
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-type text-[0.625rem] text-stamp">
+                      {String(i + 1).padStart(2, '0')}
+                    </span>
+                    <span className="text-[0.875rem] font-bold">{e.name}</span>
+                    {e.isUnlocked && (
+                      <span className="rounded bg-stamp/90 px-1 py-0.5 font-dossier text-[0.5625rem] font-bold text-paper">
+                        NEW
+                      </span>
+                    )}
+                  </div>
+                  {onPresentEvidence && (
+                    <button
+                      type="button"
+                      onClick={() => onPresentEvidence(e.name)}
+                      className={`rounded border px-1.5 py-0.5 font-dossier text-[0.6875rem] font-bold transition-colors active:scale-95 ${
+                        isSelected
+                          ? 'border-stamp bg-stamp text-paper hover:bg-stamp/90'
+                          : 'border-stamp/40 bg-stamp/5 text-stamp hover:bg-stamp/15'
+                      }`}
+                      aria-label={isSelected ? `${e.name} 제시 취소` : `${e.name} 제시`}
+                    >
+                      {isSelected ? '취소' : '제시'}
+                    </button>
+                  )}
+                </div>
+                <p className="mt-0.5 text-[0.8125rem] leading-[1.75] text-ink-soft">
+                  {e.description}
+                </p>
+              </li>
+            );
+          })}
         </ol>
       </Section>
     </div>

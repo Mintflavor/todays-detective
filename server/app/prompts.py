@@ -290,6 +290,10 @@ CASE_GENERATION_HEADER = """
    - 결말(solution)에 등장하는 모든 핵심 범행 동기, 인물 간 갈등, 트릭의 근거는 사전에 evidence_list, timeline_truth, 또는 용의자의 relationship_to_victim/secret에 반드시 복선으로 암시되어 있어야 합니다.
    - 플레이어가 사전에 알 수 없는 뜬금없는 숨겨진 과거사나 미지의 제3자 설정을 결말에 갑자기 창조하는 것을 엄격히 금지합니다.
    - summary와 world_setting에는 인물들이 사건 당일 그 장소에 모이게 된 공통의 이유(근무, 모임, 행사 등)와 사건 직전의 긴장 관계를 구체적으로 서술하세요.
+8. 숨겨진 증거(hidden_evidence_list) 규칙:
+   - 사건 당 정확히 1~2개의 숨겨진 증거를 작성하세요.
+   - 각 숨겨진 증거는 target_suspect_id(1, 2, 3 중 하나)의 인물이 숨기고 있거나 그의 증언/비밀/알리바이와 직결된 단서여야 합니다. (진범뿐 아니라 결백한 인물의 사적 비밀이나 은폐 행적도 대상이 될 수 있습니다.)
+   - trigger_condition에는 탐정이 어떤 증거를 들이밀거나 어떤 의혹/비밀을 지적했을 때 이 증거가 드러나는지 명확히 서술하세요.
 """
 
 CASE_SCHEMA_BODY = """
@@ -317,6 +321,14 @@ CASE_SCHEMA_BODY = """
     "HH:MM - 사건 발생 직전 상황",
     "HH:MM - 사건 발생 추정 시각 및 특이사항",
     "HH:MM - 사건 발각"
+  ],
+  "hidden_evidence_list": [
+    {
+      "name": "숨겨진 증거물 이름",
+      "description": "상세 묘사 (진실을 밝히는 결정적 단서)",
+      "target_suspect_id": 1,
+      "trigger_condition": "이 증거를 털어놓게 되는 조건 (예: 특정 증거를 제시받거나 자신의 비밀을 추궁당했을 때)"
+    }
   ],
   "suspects": [
     {
@@ -394,6 +406,8 @@ def generate_suspect_prompt(
     evidence,
     all_suspects=None,
     victim_info=None,
+    presented_evidence=None,
+    hidden_evidences_for_suspect=None,
 ):
     evidence_lines = "\n   ".join(
         f"{i + 1}. {e.get('name', '')}: {e.get('description', '')}"
@@ -420,6 +434,32 @@ def generate_suspect_prompt(
             f"- 사망/피해 추정 시각: {victim_info.get('incident_time', '')}"
         )
 
+    presented_evidence_section = ""
+    if presented_evidence and isinstance(presented_evidence, dict):
+        presented_evidence_section = (
+            f"\n[탐정이 지금 당신의 눈앞에 들이민 증거물!]\n"
+            f"- 증거명: {presented_evidence.get('name', '')}\n"
+            f"- 증거 상세: {presented_evidence.get('description', '')}\n"
+            f"※ 중요: 탐정이 이 구체적인 증거를 들이밀며 당신을 추궁하고 있습니다! "
+            f"이 증거가 당신의 실제 행적, 비밀, 혹은 거짓 알리바이와 관련이 있다면 크게 당황하거나, "
+            f"말을 더듬으며 변명을 늘어놓거나, 더 이상 숨기지 못하고 진실/단서를 털어놓으세요.\n"
+        )
+
+    hidden_evidence_section = ""
+    if hidden_evidences_for_suspect:
+        triggers_lines = []
+        for he in hidden_evidences_for_suspect:
+            triggers_lines.append(
+                f"- 증거명 '{he.get('name')}': 트리거 조건 [{he.get('trigger_condition')}]. "
+                f"탐정이 관련된 증거를 들이밀었거나 이 조건을 찌르는 질문을 하여 더 이상 숨길 수 없게 되었다고 판단되면, "
+                f"당황하여 이 사실이나 물건의 행방을 털어놓고, 답변 맨 끝에 반드시 '[UNLOCKED: {he.get('name')}]' 태그를 붙이세요."
+            )
+        hidden_evidence_section = (
+            f"\n[당신이 감추고 있거나 털어놓을 수 있는 숨겨진 단서/증거]\n"
+            + "\n".join(triggers_lines)
+            + "\n(위 트리거 조건이 충족되지 않았다면 이 증거를 스스로 먼저 발설하지 마세요.)\n"
+        )
+
     culprit_hint = (
         "당신은 진범입니다. 겉으로는 수사에 매우 협조적이고 예의 바른 태도를 취하면서, 논리적인 거짓 알리바이와 변명을 둘러대고 교묘하게 다른 사람에게 의심을 돌리세요. 무작정 '모른다'고 잡아떼면 오히려 의심받습니다."
         if is_culprit
@@ -440,7 +480,7 @@ def generate_suspect_prompt(
 4. 현장에서 발견된 증거물 (탐정이 언급할 수 있습니다. 이 목록에 없는 증거는 존재하지 않습니다):
    {evidence_lines}
 {victim_section}
-
+{presented_evidence_section}{hidden_evidence_section}
 [함께 있던 다른 인물들]
    {other_suspects_text}
 
@@ -457,15 +497,32 @@ def generate_suspect_prompt(
 - 답변은 구어체로 자연스럽게, 2~3문장 내외로 구체적으로 하세요.
 - 단순히 "모른다", "기억 안 난다"로 일관하지 말고, 자신의 성격, 행적, 피해자 및 동료들과의 관계에 기반해 자연스럽고 입체적으로 대화하세요.
 - 피해자나 다른 인물들에 대해 질문을 받으면 당신이 알고 있는 관계와 인상을 바탕으로 진술하세요.
+- 탐정이 [탐정이 지금 당신의 눈앞에 들이민 증거물!]을 제시한 경우, 반드시 그 증거에 대해 직접적으로 반응하거나 해명하세요.
+- 알리바이를 거짓으로 날조하거나 결정적인 물증에 대해 해명할 때에는, 지나치게 당당하기보다는 미세하게 시선을 피하거나 말을 더듬는 등 불안한 심리적 동요를 자연스럽게 묘사하세요.
+- 숨겨진 증거의 해금 조건이 충족되었다면 정황을 실토하고 답변 맨 끝에 '[UNLOCKED: 증거명]'을 정확히 기재하세요. (단, [당신이 감추고 있거나 털어놓을 수 있는 숨겨진 단서/증거] 목록에 명시된 증거가 아니거나 이미 밝혀진 증거는 절대 이 태그를 붙이지 마세요.)
 """
 
 
-def generate_evaluation_prompt(truth, culprit_name, chosen_suspect_name, reasoning, is_over_time):
+def generate_evaluation_prompt(
+    truth,
+    culprit_name,
+    chosen_suspect_name,
+    reasoning,
+    is_over_time,
+    unlocked_evidence_names=None,
+):
     penalty = (
         "\n[중요 페널티]: 탐정이 제한시간(20분)을 초과했습니다. 추리가 완벽하더라도 '시간 관리' 점수는 0점이며, 최종 등급은 최대 'B'까지만 부여할 수 있습니다."
         if is_over_time
         else "탐정은 제한 시간 내에 추리를 완료했습니다. (시간 관리 만점: 10점)"
     )
+    unlocked_section = ""
+    if unlocked_evidence_names:
+        unlocked_section = (
+            f"\n[탐정이 심문 중 추가로 밝혀낸 숨겨진 증거]\n"
+            f"- 획득한 증거: {', '.join(unlocked_evidence_names)}\n"
+            f"(탐정이 이 숨겨진 증거를 찾아내 추리에 활용했다면 '2. 논리성 & 증거' 항목에서 적극적으로 높은 점수(가산점)를 부여하세요.)\n"
+        )
     return f"""
 [절대 원칙: 사실 왜곡 금지]
 당신은 냉철한 판사입니다. 아래 제공된 [사건의 진상]을 유일한 정답으로 간주해야 합니다.
@@ -480,7 +537,7 @@ AI가 생성한 것이라도, 기존에 설정된 사건의 진상과 다른 내
 [탐정의 추리]
 지목한 범인: {chosen_suspect_name}
 추리 내용: {reasoning}
-
+{unlocked_section}
 {penalty}
 
 [평가 기준 (총 100점)]
@@ -559,9 +616,16 @@ def generate_contradiction_check_prompt(suspect, world, timeline, evidence, ques
 탐정의 질문: {question}
 용의자의 답변: {reply}
 
-[판단 기준]
-1. 모순(TRUE): 용의자의 답변이 [객관적 사실]이나 자신의 [실제 행적]과 명백히 어긋나는 거짓말을 하거나, 알리바이를 날조하거나, 현장에 없었다고 거짓 진술하는 경우.
-2. 모순 아님(FALSE): 답변이 실제 행적 및 객관적 사실과 일치하거나, 단순히 "모른다", "기억이 안 난다"고 회피하거나, 감정적인 반응만 보이는 경우.
+[엄격한 판단 기준 - 거짓말 남발 판정 방지]
+1. 모순 아님(FALSE): 아래의 경우는 거짓말이나 핑계, 회피라도 절대 모순으로 판정하지 마세요.
+   - 사적인 치부나 비밀, 개인 감정을 숨기기 위해 얼버무리거나 둘러대는 경우.
+   - 사건과 무관한 사소한 핑계를 대거나, 단순히 당황하거나 억울해하는 경우.
+   - "모른다", "기억이 잘 안 난다"고 회피하거나 주관적인 심경을 진술하는 경우.
+   - 탐정이 구체적인 물리적 증거나 타임라인을 들이밀지 않은 일반 질문에 대한 사소한 부정.
+
+2. 모순(TRUE): 오직 아래의 명백하고 결정적인 2가지 경우에만 엄격하게 TRUE로 판정하세요.
+   - [핵심 알리바이 날조]: 사건 발생 시각 또는 범행 직전/직후의 결정적 시간대에 자신이 다른 장소에 있었다고 명백히 거짓 알리바이를 확언하는 경우.
+   - [물증·타임라인과의 정면 충돌]: 공통 타임라인의 확정된 객관적 사실이나 현장에서 발견된 물리적 증거(또는 탐정이 제시한 증거)와 명백히 정면으로 배치되는 거짓 주장을 단정적으로 펼치는 경우.
 
 반드시 다음 형식 중 하나로만 정확히 출력하세요:
 [CONTRADICTION: TRUE]

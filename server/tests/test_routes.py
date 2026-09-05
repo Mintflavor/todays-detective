@@ -60,11 +60,11 @@ class TestStart:
         }, "저장 필드가 바뀌었다: %s" % sorted(spec)
         assert "culprit_id" not in spec
         assert "prompt" not in spec
-        # 값에도 범인 id가 섞이지 않아야 한다.
+        # 값에도 범인 id가 섞이지 않아야 한다 (evidence_count는 정수라 우연히 겹칠 수 있으므로 제외).
         real_culprit = next(
             s["id"] for s in doc["case_data"]["suspects"] if s.get("isCulprit")
         )
-        assert real_culprit not in spec.values()
+        assert real_culprit not in [v for k, v in spec.items() if k != "evidence_count"]
 
     def test_stores_generation_audit(self, client, test_db):
         """감사 결과가 없으면 프롬프트 준수와 안전망 개입을 구별할 수 없다."""

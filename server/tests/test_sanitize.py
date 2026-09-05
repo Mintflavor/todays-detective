@@ -21,7 +21,7 @@ from app.sanitize import (
 )
 
 # ── Lambda 원문 구현. 기준(oracle)이며 절대 수정하지 않는다 ──────────
-_LAMBDA_TOP = ("solution", "timeline_truth", "truth")
+_LAMBDA_TOP = ("solution", "timeline_truth", "truth", "hidden_evidence_list")
 _LAMBDA_SUSPECT = ("isCulprit", "secret", "real_action", "motive", "trick")
 
 

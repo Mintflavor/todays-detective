@@ -5,7 +5,7 @@
 // Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
 
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent, useCallback } from 'react';
-import { CaseData, ChatLogs, DeductionInput, Evaluation, GameError, GamePhase, LoadingType, ChatMessage } from '../types/game';
+import { CaseData, ChatLogs, DeductionInput, Evaluation, Evidence, GameError, GamePhase, LoadingType, ChatMessage } from '../types/game';
 import { getRandomPlaceholder, formatTime, shuffled } from '../lib/utils';
 import { ApiError } from '../lib/http';
 
@@ -64,6 +64,10 @@ export default function useGameEngine() {
   const [chatLogs, setChatLogs] = useState<ChatLogs>({ 0: [], 1: [], 2: [], 3: [] });
   const [actionPoints, setActionPoints] = useState<ActionPoints>({});
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+
+  // --- 증거 제시 및 해금 상태 ---
+  const [selectedEvidenceName, setSelectedEvidenceName] = useState<string | null>(null);
+  const [newlyUnlockedEvidence, setNewlyUnlockedEvidence] = useState<Evidence | null>(null);
 
   // --- UI & Audio State ---
   const [userInput, setUserInput] = useState<string>("");
@@ -299,23 +303,59 @@ export default function useGameEngine() {
   }, [preloadedData, caseFetchFailed, finalizeGameStart, goToLoadMenu]);
 
   /** API 호출만 담당한다. AP 차감과 낙관적 렌더링은 호출부에서 한 번만 한다. */
-  const runInterrogationRef = useRef<(text: string, suspectId: number, history: string) => void>(() => {});
+  const runInterrogationRef = useRef<(text: string, suspectId: number, history: string, presentedEvidenceName?: string) => void>(() => {});
 
-  const runInterrogation = useCallback(async (text: string, suspectId: number, history: string) => {
+  const runInterrogation = useCallback(async (text: string, suspectId: number, history: string, presentedEvidenceName?: string) => {
     if (!caseData?.scenarioId) return;
     setIsTyping(true);
     try {
-      const { reply, isContradiction } = await interrogateSuspect(caseData.scenarioId, suspectId, history, text);
+      const unlockedNames = (caseData.evidence_list || []).map(e => e.name);
+      const { reply, isContradiction, unlockedEvidence } = await interrogateSuspect(
+        caseData.scenarioId,
+        suspectId,
+        history,
+        text,
+        presentedEvidenceName,
+        unlockedNames
+      );
+      const isAlreadyAcquired = Boolean(
+        unlockedEvidence &&
+        caseData.evidence_list.some(e => e.name === unlockedEvidence.name)
+      );
+      const isNewEvidence = Boolean(unlockedEvidence && !isAlreadyAcquired);
+
       setChatLogs(prev => {
         const nextList: ChatMessage[] = [...(prev[suspectId] ?? []), { role: 'ai', text: reply }];
         if (isContradiction) {
-          nextList.push({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+          nextList.push({
+            role: 'system',
+            text: '※ 조서 특기사항: 용의자의 미세한 동요 포착 — 확인된 사실과의 불일치',
+          });
+        }
+        if (isNewEvidence && unlockedEvidence) {
+          nextList.push({
+            role: 'system',
+            text: `새로운 증거 확보: [${unlockedEvidence.name}] ${unlockedEvidence.description}`,
+          });
         }
         return {
           ...prev,
           [suspectId]: nextList,
         };
       });
+      if (isNewEvidence && unlockedEvidence) {
+        setCaseData(prev => {
+          if (!prev) return prev;
+          const alreadyExists = prev.evidence_list.some(e => e.name === unlockedEvidence.name);
+          if (alreadyExists) return prev;
+          return {
+            ...prev,
+            evidence_list: [...prev.evidence_list, { ...unlockedEvidence, isUnlocked: true }],
+          };
+        });
+        setNewlyUnlockedEvidence(unlockedEvidence);
+        setTimeout(() => setNewlyUnlockedEvidence(null), 5000);
+      }
     } catch (err) {
       console.error("Interrogation error:", err);
       const rateLimited = err instanceof ApiError && err.isRateLimited;
@@ -323,7 +363,7 @@ export default function useGameEngine() {
         title: rateLimited ? '심문 횟수 초과' : 'Signal Lost',
         message: err instanceof ApiError ? err.message : '용의자와의 통신이 끊겼습니다.',
         // 같은 질문을 그대로 다시 보낸다. AP는 이미 차감됐으므로 재차감하지 않는다.
-        retry: rateLimited ? undefined : () => runInterrogationRef.current(text, suspectId, history),
+        retry: rateLimited ? undefined : () => runInterrogationRef.current(text, suspectId, history, presentedEvidenceName),
       });
     } finally {
       setIsTyping(false);
@@ -331,49 +371,56 @@ export default function useGameEngine() {
   }, [caseData, interrogateSuspect]);
 
   useEffect(() => {
-    runInterrogationRef.current = (text, suspectId, history) => {
-      void runInterrogation(text, suspectId, history);
+    runInterrogationRef.current = (text, suspectId, history, presentedEvidenceName) => {
+      void runInterrogation(text, suspectId, history, presentedEvidenceName);
     };
   }, [runInterrogation]);
 
-  const handleSendMessage = useCallback(() => {
-    if (!userInput.trim() || isTyping || !caseData || !caseData.scenarioId) return;
+  const handleSendMessage = useCallback((customText?: string, customEvidence?: string) => {
+    const evidenceToPresent = customEvidence !== undefined ? customEvidence : selectedEvidenceName;
+    const rawText = (customText !== undefined ? customText : userInput).trim();
 
     // 수사 수첩(id 0)은 AP를 쓰지 않고 서버로도 가지 않는다.
     if (currentSuspectId === 0) {
+      if (!rawText) return;
       setChatLogs(prev => ({
         ...prev,
-        0: [...(prev[0] ?? []), { role: 'note', text: userInput }]
+        0: [...(prev[0] ?? []), { role: 'note', text: rawText }]
       }));
       setUserInput("");
       return;
     }
+
+    const effectiveText = rawText || (evidenceToPresent ? `이 증거(${evidenceToPresent})에 대해 설명해 주십시오.` : "");
+    if (!effectiveText || isTyping || !caseData || !caseData.scenarioId) return;
 
     // 현재 용의자의 몫만 본다. 다른 용의자가 소진됐어도 이쪽은 계속 물을 수 있다.
     if ((actionPoints[currentSuspectId] ?? 0) <= 0) return;
     const suspect = caseData.suspects.find(s => s.id === currentSuspectId);
     if (!suspect) return;
 
-    const text = userInput;
-    // 히스토리는 낙관적 렌더링 **이전** 로그로 만든다 (방금 보낸 질문은 별도 인자).
-    // system·note는 용의자 발언이 아니므로 프롬프트에 섞지 않는다.
     const history = (chatLogs[currentSuspectId] ?? [])
       .filter(msg => msg.role === 'user' || msg.role === 'ai')
       .map(msg => (msg.role === 'user' ? `탐정: ${msg.text}` : `용의자: ${msg.text}`))
       .join('\n');
 
+    const displayText = evidenceToPresent
+      ? `[증거 제시: ${evidenceToPresent}] ${effectiveText}`
+      : effectiveText;
+
     setChatLogs(prev => ({
       ...prev,
-      [currentSuspectId]: [...(prev[currentSuspectId] ?? []), { role: 'user', text }]
+      [currentSuspectId]: [...(prev[currentSuspectId] ?? []), { role: 'user', text: displayText }]
     }));
     setUserInput("");
+    setSelectedEvidenceName(null);
     setActionPoints(prev => ({
       ...prev,
       [currentSuspectId]: (prev[currentSuspectId] ?? 0) - 1,
     }));
 
-    void runInterrogation(text, suspect.id, history);
-  }, [userInput, isTyping, caseData, currentSuspectId, actionPoints, chatLogs, runInterrogation]);
+    void runInterrogation(effectiveText, suspect.id, history, evidenceToPresent ?? undefined);
+  }, [userInput, selectedEvidenceName, isTyping, caseData, currentSuspectId, actionPoints, chatLogs, runInterrogation]);
 
   const submitDeductionRef = useRef<() => void>(() => {});
 
@@ -388,11 +435,15 @@ export default function useGameEngine() {
     setGameError(null);
 
     try {
+      const unlockedNames = (caseData.evidence_list || [])
+        .filter(e => e.isUnlocked)
+        .map(e => e.name);
       const evaluationResult = await evaluateDeduction(
         caseData.scenarioId,
         chosenSuspect.name,
         deductionInput.reasoning,
-        isOverTime
+        isOverTime,
+        unlockedNames
       );
 
       const elapsedSeconds = TOTAL_SECONDS - timerSeconds;
@@ -434,6 +485,8 @@ export default function useGameEngine() {
     setCurrentSuspectId(1);
     setDeductionInput({ culpritId: null, reasoning: "" });
     setUserInput("");
+    setSelectedEvidenceName(null);
+    setNewlyUnlockedEvidence(null);
     setShowTimeOverModal(false);
     setGameError(null);
     setCaseFetchFailed(false);
@@ -509,6 +562,8 @@ export default function useGameEngine() {
     quitPrompt, confirmQuit, cancelQuit,
     audioRef,
     timerSeconds, isOverTime,
+    selectedEvidenceName, setSelectedEvidenceName,
+    newlyUnlockedEvidence,
 
     // Actions
     handleStartGame,

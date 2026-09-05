@@ -45,6 +45,8 @@ export default function TodaysDetective() {
     quitPrompt, confirmQuit, cancelQuit,
     audioRef,
     timerSeconds, isOverTime,
+    selectedEvidenceName, setSelectedEvidenceName,
+    newlyUnlockedEvidence,
 
     // Actions
     handleStartGame,
@@ -170,6 +172,9 @@ export default function TodaysDetective() {
           toggleMute={toggleMute}
           onGoToBriefing={() => setPhase('briefing')}
           onGoToDeduction={() => setPhase('deduction')}
+          selectedEvidenceName={selectedEvidenceName}
+          setSelectedEvidenceName={setSelectedEvidenceName}
+          newlyUnlockedEvidence={newlyUnlockedEvidence}
         />
       )}
 

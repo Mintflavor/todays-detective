@@ -40,9 +40,9 @@ import React, { useRef, useEffect, useState, KeyboardEvent, ChangeEvent } from '
 import Image from 'next/image';
 import {
   Volume2, VolumeX, AlertTriangle, Notebook, User, Send,
-  Stamp, FolderOpen, X, PenLine, Maximize2,
+  Stamp, FolderOpen, X, PenLine, Maximize2, Package,
 } from 'lucide-react';
-import { CaseData, ChatLogs } from '../types/game';
+import { CaseData, ChatLogs, Evidence } from '../types/game';
 import { formatTime } from '../lib/utils';
 import CaseFileRail from './CaseFileRail';
 
@@ -69,6 +69,9 @@ interface InvestigationScreenProps {
   toggleMute: () => void;
   onGoToBriefing: () => void;
   onGoToDeduction: () => void;
+  selectedEvidenceName?: string | null;
+  setSelectedEvidenceName?: (name: string | null) => void;
+  newlyUnlockedEvidence?: Evidence | null;
 }
 
 /**
@@ -230,6 +233,9 @@ export default function InvestigationScreen({
   toggleMute,
   onGoToBriefing,
   onGoToDeduction,
+  selectedEvidenceName,
+  setSelectedEvidenceName,
+  newlyUnlockedEvidence,
 }: InvestigationScreenProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +243,8 @@ export default function InvestigationScreen({
 
   /** 모바일 서류철. 데스크톱은 항상 펼쳐져 있으므로 이 상태를 쓰지 않는다. */
   const [fileOpen, setFileOpen] = useState(false);
+  /** 증거 선택 팝업 */
+  const [evidenceMenuOpen, setEvidenceMenuOpen] = useState(false);
   /**
    * 증명사진 확대 — 열린 상태를 boolean이 아니라 **어느 용의자의 사진인지**로 들고 있다.
    *
@@ -269,19 +277,21 @@ export default function InvestigationScreen({
   // 겹쳐 뜬 것을 Escape로 닫는다. 위에 있는 것부터 닫힌다.
   // 뒤로가기는 usePhaseHistory가 게임 내 이동으로 쓰므로 여기서 건드리지 않는다.
   useEffect(() => {
-    if (!fileOpen && !photoOpen) return;
+    if (!fileOpen && !photoOpen && !evidenceMenuOpen) return;
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (photoOpen) setPhotoFor(null);
+      if (evidenceMenuOpen) setEvidenceMenuOpen(false);
+      else if (photoOpen) setPhotoFor(null);
       else setFileOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [fileOpen, photoOpen]);
-
+  }, [fileOpen, photoOpen, evidenceMenuOpen]);
 
   const inputDisabled = !isNotebook && (remaining <= 0 || isTyping);
-  const sendDisabled = !isNotebook && (remaining <= 0 || isTyping || !userInput.trim());
+  const sendDisabled = isNotebook
+    ? !userInput.trim()
+    : remaining <= 0 || isTyping || (!userInput.trim() && !selectedEvidenceName);
 
   return (
     <div className="td-desk relative flex h-[100dvh] flex-col overflow-hidden">
@@ -337,6 +347,23 @@ export default function InvestigationScreen({
           </button>
         </div>
       </header>
+
+      {/* ───────── 새로운 증거 해금 알림 배너 ───────── */}
+      {newlyUnlockedEvidence && (
+        <div className="pointer-events-none absolute left-1/2 top-14 z-50 -translate-x-1/2 animate-bounce sm:top-16">
+          <div className="td-paper flex items-center gap-2.5 rounded-[2px] border-2 border-stamp bg-paper px-4 py-2.5 shadow-2xl">
+            <Package size={22} className="animate-pulse text-stamp" />
+            <div>
+              <div className="font-dossier text-[0.6875rem] font-bold tracking-widest text-stamp">
+                새로운 증거 확보!
+              </div>
+              <div className="font-dossier text-sm font-bold text-ink">
+                {newlyUnlockedEvidence.name}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ───────── 본체: 조서 + 서류철 ───────── */}
       <div className="relative z-10 flex min-h-0 flex-1 justify-center gap-5 overflow-hidden px-2 pb-2 pt-3 sm:px-4 sm:pb-3 lg:px-6 lg:pt-5">
@@ -577,6 +604,25 @@ export default function InvestigationScreen({
             })}
           </div>
 
+          {/* 증거 제시 칩 바 */}
+          {!isNotebook && selectedEvidenceName && (
+            <div className="flex items-center justify-between border-t border-dashed border-ink/20 bg-stamp/[0.06] px-3 py-1.5 font-record text-xs text-ink">
+              <div className="flex items-center gap-1.5 truncate">
+                <Package size={13} className="shrink-0 text-stamp" />
+                <span className="font-dossier text-[0.6875rem] font-bold text-stamp">제시할 증거:</span>
+                <span className="truncate font-bold text-ink">{selectedEvidenceName}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedEvidenceName?.(null)}
+                className="ml-2 shrink-0 rounded p-0.5 text-ink-faint hover:text-stamp"
+                title="증거 선택 취소"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {/*
             기재란. 조서 아래에 이어 붙은 종이 띠라서 입력이 문서의 일부처럼 보인다.
             handleInputChange·handleKeyDown이 HTMLInputElement 기준이므로 input을 유지한다.
@@ -588,6 +634,73 @@ export default function InvestigationScreen({
             >
               {isNotebook ? '메모' : '문'}
             </span>
+
+            {/* 증거 첨부 버튼 및 팝업 (수첩이 아닐 때만) */}
+            {!isNotebook && (
+              <div className="relative shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEvidenceMenuOpen((prev) => !prev)}
+                  disabled={inputDisabled}
+                  className={`grid h-9 w-9 place-items-center rounded-[2px] border transition-colors ${
+                    selectedEvidenceName
+                      ? 'border-stamp bg-stamp/15 text-stamp font-bold'
+                      : 'border-ink/25 text-ink-soft hover:border-ink/40 hover:text-ink disabled:opacity-40'
+                  }`}
+                  title="용의자에게 제시할 증거 첨부"
+                  aria-label="증거 첨부"
+                >
+                  <Package size={16} />
+                </button>
+                {evidenceMenuOpen && (
+                  <div className="td-paper absolute bottom-full left-0 z-40 mb-2 w-64 rounded-[2px] border border-ink/25 p-2.5 shadow-xl sm:w-72">
+                    <div className="mb-2 flex items-center justify-between border-b border-ink/15 pb-1 font-dossier text-[0.6875rem] font-bold text-stamp">
+                      <span>보유 증거 ({caseData.evidence_list.length}건)</span>
+                      <button
+                        type="button"
+                        onClick={() => setEvidenceMenuOpen(false)}
+                        className="text-ink-faint hover:text-ink"
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                    <div className="td-scroll max-h-48 space-y-1.5 overflow-y-auto">
+                      {caseData.evidence_list.map((ev, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEvidenceName?.(
+                              selectedEvidenceName === ev.name ? null : ev.name
+                            );
+                            setEvidenceMenuOpen(false);
+                          }}
+                          className={`w-full rounded-[2px] p-2 text-left transition-colors ${
+                            selectedEvidenceName === ev.name
+                              ? 'border border-stamp/30 bg-stamp/15 text-stamp'
+                              : 'border border-transparent text-ink hover:bg-ink/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 font-dossier text-[0.75rem] font-bold">
+                            <span className="text-stamp">#{i + 1}</span>
+                            <span className="truncate">{ev.name}</span>
+                            {ev.isUnlocked && (
+                              <span className="rounded bg-stamp px-1 py-0.2 text-[0.5625rem] font-bold text-paper">
+                                NEW
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-0.5 line-clamp-1 font-record text-[0.6875rem] text-ink-soft">
+                            {ev.description}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <input
               ref={inputRef}
               type="text"
@@ -598,6 +711,8 @@ export default function InvestigationScreen({
               placeholder={
                 !isNotebook && remaining <= 0
                   ? '이 사람에게 물을 수 있는 횟수를 다 썼습니다. 다른 용의자로 넘어가십시오.'
+                  : !isNotebook && selectedEvidenceName
+                  ? `[${selectedEvidenceName}] 제시 중... (질문 입력 또는 바로 전송)`
                   : inputPlaceholder
               }
               disabled={inputDisabled}
@@ -625,7 +740,18 @@ export default function InvestigationScreen({
               <div className="font-dossier text-[0.5625rem] font-bold tracking-[0.3em] text-stamp">사 건 서 류</div>
               <div className="mt-0.5 font-type text-[0.6875rem] text-ink-faint">No.{recordNumber(caseData)}</div>
             </div>
-            <CaseFileRail caseData={caseData} />
+            <CaseFileRail
+              caseData={caseData}
+              selectedEvidenceName={selectedEvidenceName}
+              onPresentEvidence={
+                !isNotebook
+                  ? (name) => {
+                      setSelectedEvidenceName?.(selectedEvidenceName === name ? null : name);
+                      setFileOpen(false);
+                    }
+                  : undefined
+              }
+            />
           </div>
         </aside>
       </div>
@@ -653,7 +779,18 @@ export default function InvestigationScreen({
               </button>
             </div>
             <div className="td-scroll max-h-[calc(78dvh-4.5rem)] overflow-y-auto px-4 py-4 pb-safe">
-              <CaseFileRail caseData={caseData} />
+              <CaseFileRail
+                caseData={caseData}
+                selectedEvidenceName={selectedEvidenceName}
+                onPresentEvidence={
+                  !isNotebook
+                    ? (name) => {
+                        setSelectedEvidenceName?.(selectedEvidenceName === name ? null : name);
+                        setFileOpen(false);
+                      }
+                    : undefined
+                }
+              />
             </div>
           </div>
         </div>

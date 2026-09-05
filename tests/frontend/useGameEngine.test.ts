@@ -286,7 +286,10 @@ describe('심문 횟수는 용의자별로 따로다', () => {
     expect(logs).toHaveLength(4);
     expect(logs[1]).toEqual({ role: 'user', text: '알리바이가 뭡니까?' });
     expect(logs[2]).toEqual({ role: 'ai', text: '저는 계속 방에 있었습니다.' });
-    expect(logs[3]).toEqual({ role: 'system', text: '진술과 확인된 사실 간의 불일치 감지' });
+    expect(logs[3]).toEqual({
+      role: 'system',
+      text: '※ 조서 특기사항: 용의자의 미세한 동요 포착 — 확인된 사실과의 불일치',
+    });
   });
 
   it('용의자 진술이 모순이 아닐 때는 시스템 메시지가 삽입되지 않는다', async () => {
@@ -325,5 +328,68 @@ describe('심문 횟수는 용의자별로 따로다', () => {
     act(() => result.current.handleLoadGame(makeCase('사건')));
     act(() => result.current.resetGame());
     expect(result.current.actionPoints).toEqual({});
+  });
+
+  describe('증거 제시 및 해금', () => {
+    it('증거를 첨부하여 질문을 보내면 displayText에 증거 제시가 포함되고 해금된 증거가 등록된다', async () => {
+      interrogateSuspect.mockResolvedValue({
+        reply: '사실 그 열쇠는 제가 숨겼습니다.',
+        isContradiction: false,
+        unlockedEvidence: { name: '비밀 열쇠', description: '화분 밑에서 발견' },
+      });
+
+      const { result } = renderHook(() => useGameEngine());
+      act(() => result.current.handleLoadGame(makeCase('사건')));
+
+      const target = result.current.caseData!.suspects[0].id;
+      act(() => result.current.setCurrentSuspectId(target));
+
+      act(() => result.current.setSelectedEvidenceName('피 묻은 손수건'));
+      await act(async () => {
+        result.current.handleInputChange({ target: { value: '이 손수건을 보십시오.' } } as never);
+      });
+      await act(async () => {
+        result.current.handleSendMessage();
+      });
+
+      const logs = result.current.chatLogs[target]!;
+      expect(logs[1].text).toContain('[증거 제시: 피 묻은 손수건]');
+      expect(logs[2].text).toBe('사실 그 열쇠는 제가 숨겼습니다.');
+      expect(logs[3].role).toBe('system');
+      expect(logs[3].text).toContain('새로운 증거 확보: [비밀 열쇠]');
+
+      const evidenceList = result.current.caseData!.evidence_list;
+      expect(evidenceList.some(e => e.name === '비밀 열쇠')).toBe(true);
+    });
+
+    it('이미 존재하는 증거가 응답으로 내려와도 중복 등록되거나 중복 시스템 메시지가 남지 않는다', async () => {
+      interrogateSuspect.mockResolvedValue({
+        reply: '이미 아시는 증거입니다.',
+        isContradiction: false,
+        unlockedEvidence: { name: '현장 증거 1', description: '기존에 이미 있던 증거' },
+      });
+
+      const { result } = renderHook(() => useGameEngine());
+      const customCase = makeCase('사건');
+      customCase.evidence_list = [{ name: '현장 증거 1', description: '기존에 이미 있던 증거' }];
+      act(() => result.current.handleLoadGame(customCase));
+
+      const target = result.current.caseData!.suspects[0].id;
+      act(() => result.current.setCurrentSuspectId(target));
+
+      await act(async () => {
+        result.current.handleInputChange({ target: { value: '현장 증거 1에 대해 말해보세요.' } } as never);
+      });
+      await act(async () => {
+        result.current.handleSendMessage();
+      });
+
+      const logs = result.current.chatLogs[target]!;
+      // 0: 초기 정보, 1: 질문, 2: 답변 ('새로운 증거 확보' 시스템 메시지가 없어야 함)
+      expect(logs).toHaveLength(3);
+      expect(logs.some(l => l.role === 'system' && l.text.includes('새로운 증거 확보'))).toBe(false);
+      expect(result.current.caseData!.evidence_list).toHaveLength(1);
+      expect(result.current.newlyUnlockedEvidence).toBeNull();
+    });
   });
 });

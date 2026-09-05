@@ -61,6 +61,8 @@ _FALLBACK_GRADE = "F"
 _FALLBACK_REPORT = "보고서 생성 실패"
 _FALLBACK_ADVICE = "조언을 불러올 수 없습니다."
 
+_UNLOCKED_RE = re.compile(r"\[UNLOCKED:\s*([^\]]+)\]", re.IGNORECASE)
+
 
 def _oid(scenario_id: str) -> ObjectId:
     """Lambda는 ObjectId 변환 실패를 400 'Invalid scenario id'로 처리했다."""
@@ -369,6 +371,35 @@ def chat(request: Request, req: ChatRequest) -> ChatResponse:
     if suspect is None:
         raise HTTPException(status_code=404, detail="Suspect not found")
 
+    # 플레이어가 제시한 증거 객체 탐색
+    presented_evidence = None
+    if req.presentedEvidenceName:
+        all_evidences = (case_data.get("evidence_list") or []) + (
+            case_data.get("hidden_evidence_list") or []
+        )
+        presented_evidence = next(
+            (
+                e
+                for e in all_evidences
+                if isinstance(e, dict) and e.get("name") == req.presentedEvidenceName
+            ),
+            None,
+        )
+        if not presented_evidence:
+            presented_evidence = {
+                "name": req.presentedEvidenceName,
+                "description": "탐정이 제시한 증거",
+            }
+
+    # 이 용의자 대상의 아직 해금되지 않은 숨겨진 증거 목록
+    hidden_evidences_for_suspect = [
+        he
+        for he in (case_data.get("hidden_evidence_list") or [])
+        if isinstance(he, dict)
+        and he.get("target_suspect_id") == req.suspectId
+        and he.get("name") not in (req.unlockedEvidenceNames or [])
+    ]
+
     system_prompt = generate_suspect_prompt(
         suspect,
         case_data.get("world_setting") or {},
@@ -376,20 +407,57 @@ def chat(request: Request, req: ChatRequest) -> ChatResponse:
         case_data.get("evidence_list") or [],
         all_suspects=case_data.get("suspects") or [],
         victim_info=case_data.get("victim_info") or {},
+        presented_evidence=presented_evidence,
+        hidden_evidences_for_suspect=hidden_evidences_for_suspect,
     )
     # 프롬프트 조립 형태를 Lambda와 동일하게 유지한다.
+    presented_msg_prefix = (
+        f"[증거 제시: {presented_evidence['name']}] " if presented_evidence else ""
+    )
     full_prompt = (
         f"{system_prompt}\n\n[이전 대화]\n{req.history}\n\n"
-        f"탐정: {req.message}\n용의자:"
+        f"탐정: {presented_msg_prefix}{req.message}\n용의자:"
     )
 
     # GEMINI_CHAT_MODEL or GEMINI_MODEL 폴백 (config.chat_model이 담당)
     reply = gemini.call_gemini(full_prompt, get_settings().chat_model)
 
+    # 숨겨진 증거 해금 태그 파싱
+    unlocked_evidence = None
+    unlocked_match = _UNLOCKED_RE.search(reply)
+    if unlocked_match:
+        unlocked_name = unlocked_match.group(1).strip()
+        already_acquired_names = {
+            e.get("name")
+            for e in (case_data.get("evidence_list") or [])
+            if isinstance(e, dict) and e.get("name")
+        } | set(req.unlockedEvidenceNames or [])
+
+        for he in case_data.get("hidden_evidence_list") or []:
+            if isinstance(he, dict):
+                he_name = he.get("name", "")
+                if (
+                    he_name == unlocked_name
+                    or unlocked_name in he_name
+                    or he_name in unlocked_name
+                ):
+                    # 이미 획득한 증거 목록에 없어야만 신규 해금으로 인정
+                    if he_name not in already_acquired_names and unlocked_name not in already_acquired_names:
+                        unlocked_evidence = {
+                            "name": he.get("name"),
+                            "description": he.get("description"),
+                        }
+                    break
+        reply = _UNLOCKED_RE.sub("", reply).strip()
+
     # 모순 여부 판정 (1회 재시도 후 False 폴백)
     is_contradiction = check_contradiction(suspect, case_data, req.message, reply)
 
-    return ChatResponse(reply=reply, isContradiction=is_contradiction)
+    return ChatResponse(
+        reply=reply,
+        isContradiction=is_contradiction,
+        unlockedEvidence=unlocked_evidence,
+    )
 
 
 # ─────────────────────────── 추리 평가 ───────────────────────────
@@ -409,6 +477,7 @@ def evaluate(request: Request, req: EvaluateRequest) -> EvaluateResponse:
         req.deductionData.culpritName,
         req.deductionData.reasoning,
         req.deductionData.isOverTime,
+        unlocked_evidence_names=req.deductionData.unlockedEvidenceNames,
     )
     # 평가는 기본 모델을 쓴다 (chat 모델이 아니다) — Lambda와 동일.
     result_text = gemini.call_gemini(eval_prompt)
