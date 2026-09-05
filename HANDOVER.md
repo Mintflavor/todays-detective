@@ -62,9 +62,9 @@ todays-detective-minio   healthy   3일 가동
 
 이 세 가지는 인수 직후에 처리하는 것을 권한다. 순서대로 위험하다.
 
-### 2.1 🔴 MongoDB 앱 계정 비밀번호를 교체할 것
+### 2.1 🟢 MongoDB 앱 계정 비밀번호 교체 완료 (2026-09-05)
 
-**2026-08-26, AI 보조 작업 중 `detective` 계정의 접속 문자열이 대화 기록에 평문으로
+> **2026-09-05 조치 완료**: 32자리 고강도 비밀번호로 교체하고 unraid `.env` 3곳 반영 및 컨테이너 재기동을 완료함.
 노출됐다.** `.env`의 `RATE_LIMIT_STORAGE_URI` 값에 비밀번호가 포함돼 있는데, 리밋 설정을
 확인하려고 `RATE_LIMIT_*` 전체를 출력한 것이 원인이다.
 
@@ -136,9 +136,9 @@ printf '30 4 * * *' > $S/cronSchedule
 두는 것을 강력히 권한다. unraid의 **CA Appdata Backup** 플러그인에
 `todays-detective`를 추가하면 셋 다 한 번에 해결된다 — 원래 계획이었으나 미뤄져 있다.
 
-### 2.3 🟡 배포된 코드가 `master`에 없다
+### 2.3 🟢 master 브랜치 운영 코드 동기화 완료 (2026-09-05)
 
-**`master`는 운영 코드가 아니다.** 73커밋 뒤처져 있고, PR #1 병합 이후로 갱신되지 않았다.
+> **2026-09-05 조치 완료**: `preview` 브랜치를 `master`에 병합하고 원격 `origin/master` 및 `origin/preview` 동기화 완료.
 
 ```
 master        origin/master 기준 73커밋 뒤   ← 배포된 적 없음
@@ -349,9 +349,8 @@ unraid의 `user.scripts`에 AWS 시대의 `aws_s3_todays-detective_backup`(rclon
 
 ### 6.2 레포 정리
 
-- [ ] `master`를 실제 운영 코드와 맞추기 (§2.3)
-- [ ] `server/app/__pycache__/*.pyc` **2개가 git에 추적되고 있다.** 이미지에는
-      `server/.dockerignore`가 걸러 주므로 배포 영향은 없지만, 커밋마다 바이너리 diff가 생긴다
+- [x] `master`를 실제 운영 코드와 맞추기 (§2.3) — 2026-09-05 완료
+- [x] `server/app/__pycache__/*.pyc` git 추적 해제 및 `.gitignore` 추가 — 2026-09-05 완료
 - [ ] 레포 루트 `.env` 처리 — AWS 시대의 죽은 키들과 **무관한 `GITHUB_MCP_PAT`이 함께
       들어 있다.** 이 PAT이 아직 살아 있는지 확인하고, 살아 있다면 파기하거나 옮길 것.
       `.gitignore`에 있어 커밋되지는 않았다
