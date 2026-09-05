@@ -37,7 +37,7 @@ from ..models import (
     game_result_to_db,
 )
 from ..prompts import (
-    CASE_GENERATION_PROMPT,
+    build_case_spec,
     generate_evaluation_prompt,
     generate_portrait_prompt,
     generate_suspect_prompt,
@@ -110,6 +110,96 @@ def _attach_portrait(suspect: dict[str, Any]) -> None:
         )
 
 
+# 최근 사용 회피 창 크기.
+#
+# 무대 78종에 월 25판이면 생일 문제로 3~4회 겹친다. 최근 20판을 피하면 한 달 안에서는
+# 사실상 중복이 없다. 조건은 36종이라 창을 더 좁게 둔다 (풀의 1/3을 넘기면 남는 것이
+# 적어 다양성이 오히려 줄어든다).
+_RECENT_STAGE_WINDOW = 20
+_RECENT_CONDITION_WINDOW = 10
+
+
+def _recent_choices() -> tuple[set[str], set[str]]:
+    """최근 생성에 쓴 무대·조건을 모은다. (무대, 조건)
+
+    이건 **최적화이지 필수 경로가 아니다.** 조회에 실패하면 빈 집합을 돌려주고
+    전체 풀에서 고르게 한다 — DB 문제로 159원짜리 생성을 막을 이유가 없다.
+    """
+    try:
+        docs = list(
+            db.get_scenarios()
+            .find({"generation_spec": {"$exists": True}}, {"generation_spec": 1})
+            .sort("created_at", -1)
+            .limit(_RECENT_STAGE_WINDOW)
+        )
+    except Exception:
+        logger.warning("최근 생성 이력 조회 실패 — 전체 풀에서 고른다", exc_info=True)
+        return set(), set()
+
+    stages: set[str] = set()
+    conditions: set[str] = set()
+    for i, d in enumerate(docs):
+        # 형태를 신뢰하지 않는다. dict가 아니면 넘긴다 (수기 편집·마이그레이션 사고).
+        spec = d.get("generation_spec")
+        if not isinstance(spec, dict):
+            continue
+        stage = spec.get("stage")
+        if isinstance(stage, str) and stage:
+            stages.add(stage)
+        if i < _RECENT_CONDITION_WINDOW:
+            condition = spec.get("condition")
+            if isinstance(condition, str) and condition:
+                conditions.add(condition)
+    return stages, conditions
+
+
+def _coerce_bool(value: object) -> bool:
+    """LLM이 isCulprit을 문자열로 줄 수 있다.
+
+    파이썬 truthiness에 그냥 맡기면 `"false"`가 True가 되어 **엉뚱한 인물이
+    범인이 된다.** find_culprit()은 truthiness를 쓰므로 여기서 걸러야 한다.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() == "true"
+    return bool(value)
+
+
+def _normalize_culprit(case_data: dict[str, Any], expected_id: int) -> bool:
+    """isCulprit을 boolean으로 정규화하고 정확히 1명만 남긴다. 제자리 수정.
+
+    범인이 0명이면 find_culprit()이 None을 반환하고, 평가 프롬프트의 정답이
+    "Unknown"이 되어 **모든 추리가 조용히 틀리게 채점된다.** 예외가 나지 않으므로
+    반드시 여기서 막는다.
+
+    교정이 발동했으면 True를 반환한다 (감사용).
+    """
+    suspects = [s for s in case_data.get("suspects") or [] if isinstance(s, dict)]
+    if not suspects:
+        return False
+
+    for s in suspects:
+        s["isCulprit"] = _coerce_bool(s.get("isCulprit"))
+
+    culprits = [s for s in suspects if s["isCulprit"]]
+    if len(culprits) == 1:
+        return False
+
+    # 지정한 id를 우선 쓰고, 없으면 첫 번째 인물로 떨어뜨린다.
+    target = next((s for s in suspects if s.get("id") == expected_id), suspects[0])
+    logger.warning(
+        "생성 결과의 범인이 %d명이다 (지정 id=%s). '%s'(id=%s)로 교정한다.",
+        len(culprits),
+        expected_id,
+        target.get("name", "?"),
+        target.get("id"),
+    )
+    for s in suspects:
+        s["isCulprit"] = s is target
+    return True
+
+
 @router.post("/start", response_model=GameStartResponse)
 # 전역 제한. per-IP는 XFF가 전달되지 않아 불가능하다. 근거는 app/ratelimit.py 참조.
 @limiter.limit(_settings.rate_limit_start_global, key_func=global_key)
@@ -121,13 +211,71 @@ def start_case(request: Request) -> GameStartResponse:
     """
     settings = get_settings()
 
-    raw = gemini.call_gemini(CASE_GENERATION_PROMPT, settings.gemini_model)
+    # 다양성 축(무대·조건·범죄 유형·범인 위치·증거 개수)을 서버에서 뽑아 주입한다.
+    # LLM에게 무작위 선택을 맡기면 고르지 않는다 — prompts.py 주석 참조.
+    recent_stages, recent_conditions = _recent_choices()
+    spec = build_case_spec(
+        recent_stages=recent_stages, recent_conditions=recent_conditions
+    )
+    raw = gemini.call_gemini(spec.prompt, settings.gemini_model)
     case_data = _parse_case_json(raw)
 
     suspects = case_data.get("suspects") or []
     if not suspects:
         logger.error("생성된 사건에 suspects가 없습니다: keys=%s", list(case_data.keys()))
         raise HTTPException(status_code=500, detail="Invalid generated case data")
+
+    # 지정 조건을 지켰는지 확인한다. isCulprit은 교정하고, 나머지는 경고만 남긴다
+    # (서사와 어긋나게 값을 덮어쓰면 사건이 앞뒤가 안 맞는다).
+    #
+    # 매 생성의 지정값을 남긴다. 이게 없으면 "LLM이 지정을 따랐는지"를
+    # 사후에 판정할 수 없다 — 결과만 봐서는 우연히 맞은 것과 구별되지 않는다.
+    logger.info(
+        "지정 조건: crime_type=%s culprit_id=%d evidence=%d stage=%.30s "
+        "(최근 회피: 무대 %d종, 조건 %d종)",
+        spec.crime_type,
+        spec.culprit_id,
+        spec.evidence_count,
+        spec.stage,
+        len(recent_stages),
+        len(recent_conditions),
+    )
+    culprit_was_normalized = _normalize_culprit(case_data, spec.culprit_id)
+
+    actual_culprit = next(
+        (s for s in suspects if isinstance(s, dict) and s.get("isCulprit")), None
+    )
+    actual_culprit_id = (actual_culprit or {}).get("id")
+
+    # 감사 결과는 **불리언만** 남긴다. 지정 범인 id를 저장하면 그 자체가 스포일러다.
+    # 컨테이너를 재생성하면 stdout 로그는 사라지므로 DB에 남겨야 사후 확인이 된다
+    # (실제로 검증 직후 재시작해서 로그를 날린 적이 있다).
+    generation_audit = {
+        "culprit_followed": actual_culprit_id == spec.culprit_id,
+        "crime_type_followed": case_data.get("crime_type") == spec.crime_type,
+        "evidence_count_followed": len(case_data.get("evidence_list") or [])
+        == spec.evidence_count,
+        "culprit_normalized": culprit_was_normalized,
+    }
+
+    if actual_culprit_id != spec.culprit_id:
+        # 교정 대상이 아니다 (범인은 정확히 1명이다). LLM이 다른 인물을 골랐을 뿐이며
+        # 서사는 그 인물 기준으로 일관되므로 덮어쓰지 않는다. 다만 빈도는 봐야 한다.
+        logger.warning(
+            "범인 위치 불일치: 지정 id=%d 결과 id=%s (%s)",
+            spec.culprit_id,
+            actual_culprit_id,
+            (actual_culprit or {}).get("name", "?"),
+        )
+    if case_data.get("crime_type") != spec.crime_type:
+        logger.warning(
+            "crime_type 불일치: 지정=%s 결과=%s", spec.crime_type, case_data.get("crime_type")
+        )
+    actual_evidence = len(case_data.get("evidence_list") or [])
+    if actual_evidence != spec.evidence_count:
+        logger.warning(
+            "evidence_list 개수 불일치: 지정=%d 결과=%d", spec.evidence_count, actual_evidence
+        )
 
     # 초상화 3장 병렬 생성. 순차로는 대기시간이 3배가 된다.
     with ThreadPoolExecutor(max_workers=len(suspects)) as pool:
@@ -140,6 +288,9 @@ def start_case(request: Request) -> GameStartResponse:
             "summary": case_data.get("summary", ""),
             "crime_type": case_data.get("crime_type") or "Unknown",
             "case_data": case_data,
+            # storable()이 culprit_id를 제외한다. 직접 dict를 만들지 말 것.
+            "generation_spec": spec.storable(),
+            "generation_audit": generation_audit,
             "created_at": now,
         }
     )

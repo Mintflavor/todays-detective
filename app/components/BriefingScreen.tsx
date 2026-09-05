@@ -27,7 +27,7 @@ export default function BriefingScreen({ caseData, onStartInvestigation }: Brief
         <div className="p-8 relative z-10">
           <div className="flex justify-between items-start mb-8 border-b-2 border-gray-800 pb-4">
             <div>
-              <span className="bg-red-800 text-white text-[10px] px-2 py-1 font-bold tracking-widest uppercase">Top Secret</span>
+              <span className="bg-red-800 text-white text-[0.625rem] px-2 py-1 font-bold tracking-widest uppercase">Top Secret</span>
               <h2 className="text-2xl font-bold mt-2 text-gray-900 leading-tight">{caseData.title}</h2>
             </div>
             <div className="w-12 h-12 border-2 border-dashed border-gray-400 flex items-center justify-center opacity-40 rotate-12">

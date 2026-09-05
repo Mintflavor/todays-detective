@@ -1,41 +1,306 @@
 @import "tailwindcss";
 
+/*
+ * 작성자 : 박현일
+ * 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+ *
+ * Author: Hyunil Park
+ * Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+ */
+
+/* ─────────────────────────────────────────────────────────────
+   디자인 토큰
+   ─────────────────────────────────────────────────────────────
+   심문 화면은 "어두운 책상 위에 놓인 밝은 조서"다.
+   화면 전체를 밝게 뒤집지 않는다 — 다른 화면들이 전부 다크이므로
+   테마가 뒤집히면 이동할 때마다 눈이 튄다. 책상(바깥)은 어둡게 두고
+   종이(조서)만 빛을 받는다.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* 책상 — 어두운 나무 */
+  --color-desk: #17140f;
+  --color-desk-2: #241e16;
+
+  /* 종이 */
+  --color-paper: #e9e2d0;
+  --color-paper-2: #ddd3bd;
+  --color-paper-3: #cfc4aa;
+  --color-paper-edge: #b8ac90;
+
+  /* 잉크 */
+  --color-ink: #23201b;
+  --color-ink-soft: #574f44;
+  /* 4.5:1을 넘겨야 한다 — 이 색으로 빈 상태 안내문을 찍는다.
+     처음 값(#8d8474)은 종이 위에서 2.86:1이라 읽히지 않았다. */
+  --color-ink-faint: #615847;
+
+  /* 붉은 관인 — 도장, 시간 초과, 범인 지목 */
+  --color-stamp: #9b2721;
+  --color-stamp-2: #7d1c17;
+
+  /* 파란 볼펜 — 플레이어가 쓴 것 (질문·메모) */
+  --color-pen: #2b4372;
+
+  /*
+   * 한글 세리프 두 종 + 타자기 한 종.
+   * Hahmlet은 고대비 한글 세리프라 조서 제목이 문서처럼 읽힌다.
+   * 숫자·사건번호·타이머는 Cutive Mono로 찍어 "타자기로 채운 서식" 느낌을 만든다.
+   */
+  --font-dossier: "Hahmlet", "Nanum Myeongjo", serif;
+  --font-record: "Nanum Myeongjo", "Hahmlet", serif;
+  /* Cutive Mono·Courier New에는 한글 글리프가 없다. 숫자 칸에 한글이 섞이면
+     임의의 시스템 폰트로 떨어지므로 나눔명조를 대체로 끼워 둔다. */
+  --font-type: "Cutive Mono", "Courier New", "Nanum Myeongjo", monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #17140f;
+  --foreground: #ededed;
+
+  /*
+   * ⚠️ 이 선언을 지우면 심문 화면의 색이 뒤집힌다.
+   *
+   * Chrome의 자동 다크 모드(Auto Dark Mode for Web Contents)는 페이지가 다크를
+   * 직접 처리한다고 선언하지 않으면 **밝은 표면을 강제로 어둡게 다시 칠한다.**
+   * 이 앱은 대부분 다크라 눈에 띄지 않았는데, 심문 화면의 크림색 조서가 들어오면서
+   * 종이가 어두운 갈색으로, 검은 잉크가 크림색으로, 붉은 관인이 연어색으로 반전됐다.
+   *
+   * 더 나쁜 건 흐려짐이다 — 강제 다크는 CSS 필터로 구현되고, 필터가 걸리면 요소가
+   * 합성 레이어로 올라가 **서브픽셀 안티에일리어싱이 꺼진다.** 글자가 자글자글해진다.
+   * 모니터 해상도와 무관하게 재현되는 이유가 이것이다.
+   */
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/*
+ * 큰 화면에서 루트 글자 크기를 올린다 = 브라우저 확대와 같은 효과.
+ *
+ * QHD(2560px) 100%에서는 14px 본문이 너무 작아 브라우저를 125%로 확대해야
+ * 플레이할 수 있었다. 확대를 사용자에게 맡기면 조서 폭(rem 기준)까지 같이 커져
+ * 레이아웃이 어긋나므로, 화면 폭을 기준으로 우리가 정한다.
+ *
+ * 이게 성립하려면 **치수가 rem이어야 한다.** 심문 화면의 글자·상자 치수는 원래
+ * px로 박혀 있어서 루트 크기를 올려도 따라오지 않았다 (101곳을 rem으로 바꿨다).
+ * 테두리·모서리·1~4px 간격은 px로 남겼다 — 확대하면 헤어라인이 뭉개진다.
+ *
+ * dvh는 rem이 아니라 뷰포트 기준이므로 `h-[100dvh]`는 영향을 받지 않는다.
+ * 그래서 화면이 넘치지 않는다 (CSS `zoom`을 썼다면 이 부분이 깨진다).
+ */
+@media (min-width: 1728px) {
+  :root { font-size: 18px; }    /* FHD 이상 — 약 1.125배 */
 }
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@media (min-width: 2200px) {
+  :root { font-size: 20px; }    /* QHD — 약 1.25배 */
+}
+@media (min-width: 3000px) {
+  :root { font-size: 23px; }    /* 4K */
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* 기존 Arial을 대체한다. body에 font-serif가 걸려 있었지만 이 규칙이 이겨서 무시되고 있었다. */
+  font-family: var(--font-record);
   user-select: none;
   -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
 }
 
 img {
   -webkit-user-drag: none;
 }
 
-input, textarea {
+input,
+textarea {
   user-select: text;
   -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   빠져 있던 유틸리티
+   ─────────────────────────────────────────────────────────────
+   animate-fade-in은 8개 컴포넌트에서 16번 쓰이는데 **정의된 적이 없었다.**
+   Tailwind v4에 그런 유틸리티가 없어서 지금까지 조용히 아무 일도 하지 않았다.
+   pb-safe도 같다 — 아이폰 홈바 여백이 빠져 있었다.
+   ───────────────────────────────────────────────────────────── */
+@keyframes td-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@utility animate-fade-in {
+  animation: td-fade-in 0.3s ease-out both;
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 조서가 책상 위로 올라오는 등장 */
+@keyframes td-sheet-in {
+  /* 소수 배율(0.995)을 쓰면 그 0.45초 동안 글자가 재샘플링돼 흐려진다.
+     정수 이동만 쓴다. */
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* 사진이 클립에 물리며 떨어진다 */
+@keyframes td-clip-in {
+  0% { opacity: 0; transform: translateY(-14px) rotate(-6deg); }
+  60% { transform: translateY(2px) rotate(-1.2deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(-1.6deg); }
+}
+
+/* 타자기 커서 */
+@keyframes td-caret {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+/*
+ * 도장이 찍힌다.
+ *
+ * 시작 배율을 1.6배로 두면 「시간 초과」 관인이 모바일에서 그 순간 117px까지 커져
+ * 조서 폭(359px)의 오른쪽 끝을 넘고, 상위 컨테이너의 overflow-hidden에 잘린다.
+ * 한자 4자(時間超過)였을 때는 걸리지 않았는데 한글 5자로 바꾸면서 폭이 늘었다.
+ * 1.2배면 확대 정점에서도 조서 안에 남는다.
+ */
+@keyframes td-stamp-in {
+  0% { opacity: 0; transform: scale(1.2) rotate(-16deg); }
+  70% { opacity: 1; transform: scale(0.96) rotate(-7deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-8deg); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   책상과 종이
+   ───────────────────────────────────────────────────────────── */
+
+/* 어두운 나무 책상 — 결과 스탠드 조명 */
+.td-desk {
+  background-color: var(--color-desk);
+  background-image:
+    radial-gradient(80% 55% at 50% -8%, rgba(226, 190, 120, 0.16), transparent 70%),
+    repeating-linear-gradient(
+      92deg,
+      rgba(255, 255, 255, 0.014) 0 2px,
+      transparent 2px 7px
+    ),
+    linear-gradient(178deg, var(--color-desk-2), var(--color-desk) 55%);
+}
+
+/*
+ * 조서 용지. 결·얼룩·가장자리 그늘을 겹쳐 종이 두께를 만든다.
+ * feTurbulence 노이즈를 data URI로 얹는다 (외부 이미지 요청 없음).
+ */
+.td-paper {
+  /* 루트는 dark로 선언했지만 이 표면만은 밝다.
+     입력 캐럿·선택 영역·스크롤바가 light 기준으로 그려져야 한다. */
+  color-scheme: light;
+  background-color: var(--color-paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.62' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.22'/%3E%3C/svg%3E"),
+    radial-gradient(70% 40% at 82% 8%, rgba(150, 120, 70, 0.09), transparent 60%),
+    radial-gradient(50% 35% at 8% 96%, rgba(150, 120, 70, 0.08), transparent 62%),
+    linear-gradient(172deg, #efe8d7 0%, var(--color-paper) 42%, var(--color-paper-2) 100%);
+  background-blend-mode: multiply, normal, normal, normal;
+  /*
+   * body에 걸린 `antialiased`(-webkit-font-smoothing: antialiased)는 회색조
+   * 안티에일리어싱이라 밝은 종이 위의 어두운 세리프를 얇고 흐리게 만든다.
+   * 다른 화면은 어두운 배경이라 그 설정이 맞지만, 종이에서만 서브픽셀로 되돌린다.
+   */
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 -1px 0 rgba(90, 74, 48, 0.14) inset,
+    0 2px 0 var(--color-paper-3),
+    0 3px 0 var(--color-paper-edge),
+    0 22px 42px -12px rgba(0, 0, 0, 0.75),
+    0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* 좌측 여백의 붉은 괘선 + 편철 구멍 두 개 */
+.td-margin-rule {
+  background-image: linear-gradient(
+    to right,
+    transparent calc(var(--td-margin, 3rem) - 1px),
+    rgba(155, 39, 33, 0.38) calc(var(--td-margin, 3rem) - 1px),
+    rgba(155, 39, 33, 0.38) var(--td-margin, 3rem),
+    transparent var(--td-margin, 3rem)
+  );
+}
+
+/* 옅은 괘선 — 진술이 줄 위에 앉은 것처럼 보이게 */
+.td-ruled {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 27px,
+    rgba(35, 32, 27, 0.075) 27px 28px
+  );
+}
+
+/* 편철 구멍 */
+.td-punch {
+  background: radial-gradient(circle at 50% 50%, #100d09 60%, rgba(0, 0, 0, 0.25) 61%, transparent 72%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/*
+ * 「타자기 잉크 번짐」을 text-shadow로 만들려 했다가 되돌렸다.
+ *
+ * 글자 색과 같은 그림자를 0.6px 번지게 깔면 라틴 문자에서는 질감으로 읽히는데,
+ * **한글은 한 글자에 획이 훨씬 많아서** 그 헤일로가 획 사이 공간과 받침 속을
+ * 메워 버린다. 14px에서 글자가 자글자글하게 흐려졌다.
+ *
+ * 타자기 감각은 글자를 더럽히지 않고 얻는다 — 숫자·사건번호의 Cutive Mono,
+ * 문/답 서식, 종이 결, 붉은 관인이 이미 그 일을 한다.
+ * 본문은 선명해야 한다.
+ */
+
+.td-caret::after {
+  content: "▌";
+  margin-left: 0.15em;
+  animation: td-caret 1.05s steps(1) infinite;
+}
+
+/*
+ * 붉은 관인.
+ *
+ * 처음에는 opacity 0.88 + mix-blend-mode: multiply로 「잉크가 종이에 먹은」 느낌을
+ * 냈는데, 둘 다 요소를 별도 합성 레이어로 올려 **서브픽셀 안티에일리어싱을 끈다.**
+ * 「범인 지목」처럼 글자가 들어가는 관인은 그래서 흐릿해졌다.
+ * 색으로만 표현한다 — 대비도 4.2:1에서 6.0:1로 올라간다.
+ */
+.td-stamp {
+  color: var(--color-stamp);
+  border: 2.5px solid var(--color-stamp);
+  box-shadow: 0 0 0 1px rgba(155, 39, 33, 0.25) inset;
+  background-blend-mode: multiply;
+}
+
+/* 스크롤바를 종이 안에 숨긴다 */
+.td-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(87, 79, 68, 0.35) transparent;
+}
+.td-scroll::-webkit-scrollbar {
+  width: 9px;
+}
+.td-scroll::-webkit-scrollbar-thumb {
+  background: rgba(87, 79, 68, 0.3);
+  border-radius: 9px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.td-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

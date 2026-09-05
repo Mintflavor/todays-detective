@@ -31,8 +31,8 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
               <Clock size={18} /> 자원 및 시간
             </h3>
             <p className="text-sm leading-relaxed text-gray-800">
-              당신에게는 <span className="font-bold text-red-700">20번의 행동력(AP)</span>만 주어집니다.<br/>
-              또한 <span className="font-bold text-red-700">10분 내</span>에 해결하지 못하면, <br/>
+              <span className="font-bold text-red-700">용의자 한 명당 20번</span>씩 질문할 수 있습니다.<br/>
+              또한 <span className="font-bold text-red-700">20분 내</span>에 해결하지 못하면, <br/>
               아무리 완벽한 추리라도 <span className="underline">최대 B등급</span>만 받게 됩니다.
             </p>
           </div>
@@ -41,10 +41,10 @@ export default function TutorialModal({ onComplete }: TutorialModalProps) {
             <h3 className="font-bold text-gray-700 text-xs uppercase tracking-widest mb-2">질문 팁</h3>
             <div className="space-y-2 text-sm">
               <div className="flex gap-2 text-red-700/70">
-                <X size={16} /> "너 범인이야?" (단순 부정만)
+                <X size={16} /> &ldquo;너 범인이야?&rdquo; (단순 부정만)
               </div>
               <div className="flex gap-2 text-green-800">
-                <CheckCircle size={16} /> "8시 정전 때 어디에 있었나?"
+                <CheckCircle size={16} /> &ldquo;8시 정전 때 어디에 있었나?&rdquo;
               </div>
             </div>
           </div>

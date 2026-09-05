@@ -1,6 +1,6 @@
 # 오늘의 탐정 (Today's Detective)
 
-Gemini가 생성한 사건을 10분 안에 추리하는 웹 게임. 용의자 3명을 심문해 범인을 지목하면
+Gemini가 생성한 사건을 20분 안에 추리하는 웹 게임. 용의자 3명을 심문해 범인을 지목하면
 AI가 등급(S~F)과 수사 보고서를 돌려준다.
 
 **https://detective.mintflavor.ddns.net**
@@ -26,10 +26,21 @@ AWS(Lambda·API Gateway·S3·MongoDB Atlas) + Vercel에서 자체 호스팅으�
 이전 과정의 설계 판단과 실제로 부딪힌 함정은
 [plan/unraid_migration_plan.md](plan/unraid_migration_plan.md)에 기록돼 있다.
 
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [HANDOVER.md](HANDOVER.md) | **인수인계** — 접근 권한, 운영 절차, 즉시 처리할 위험, 미완 작업 |
+| [CLAUDE.md](CLAUDE.md) | 코드를 만지기 전에 알아야 할 함정 12가지 |
+| [infra/README.md](infra/README.md) | unraid 스택 구성·배포·검증 |
+| [plan/](plan/) | 설계와 이전 과정의 기록 (실패한 시도와 이유 포함) |
+
+**프로젝트를 처음 인수한다면 [HANDOVER.md](HANDOVER.md)부터 읽을 것.**
+
 ## 게임 흐름
 
 ```
-intro → 브리핑 → 튜토리얼 → 수사(10분, 20 AP) → 추리 → 결과
+intro → 브리핑 → 튜토리얼 → 수사(20분, 용의자별 20회) → 추리 → 결과
                                     ↑
                         "지난 사건 기록"으로 이전 사건 재생 가능
 ```

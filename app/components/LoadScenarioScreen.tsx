@@ -1,7 +1,13 @@
+// 작성자 : 박현일
+// 이 코드의 소유권은 작성자에게 있으며 아래 코드의 일부 또는 전체는 AI(Claude, Gemini)를 활용하여 작성되었습니다.
+//
+// Author: Hyunil Park
+// Ownership of this code belongs to the author, and some or all of the code below has been written using AI (Claude, Gemini).
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, ChevronLeft, ChevronRight, FolderOpen, Filter } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, FolderOpen, Filter, RefreshCw } from 'lucide-react';
 import { getScenarios, ScenarioListItem, getScenarioDetail } from '../lib/api';
 import { CaseData } from '../types/game';
 
@@ -16,6 +22,8 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filterCrimeType, setFilterCrimeType] = useState<string>("ALL");
+  // 어느 카드를 여는 중인지. 없으면 클릭해도 아무 반응이 없어 연타로 중복 실행된다.
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   useEffect(() => {
     setPage(1); // Reset page on filter change
@@ -32,7 +40,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
     try {
       const data = await getScenarios(pageNum, 10, filterCrimeType);
       setScenarios(data);
-    } catch (err) {
+    } catch {
       setError("사건 기록을 불러올 수 없습니다. 서버 상태를 확인하세요.");
     } finally {
       setLoading(false);
@@ -40,15 +48,16 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
   };
 
   const handleScenarioClick = async (id: string) => {
-    setLoading(true);
+    if (openingId) return; // 중복 실행 방지
+    setOpeningId(id);
+    setError(null);
     try {
       const caseData = await getScenarioDetail(id);
       // Inject the scenarioId so the game engine can use it
-      const caseDataWithId = { ...caseData, scenarioId: id };
-      onLoad(caseDataWithId);
-    } catch (err) {
+      onLoad({ ...caseData, scenarioId: id });
+    } catch {
       setError("사건 파일을 여는 데 실패했습니다.");
-      setLoading(false);
+      setOpeningId(null);
     }
   };
 
@@ -58,7 +67,7 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
        <div className="absolute inset-0 z-0 opacity-50" style={{backgroundImage: 'radial-gradient(#222 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
 
       <header className="w-full max-w-4xl flex items-center justify-between mb-8 z-10 border-b border-gray-700 pb-4">
-        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-amber-500 transition-colors">
+        <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-amber-500 transition-colors min-h-[2.75rem] pr-2">
           <ArrowLeft size={20} /> 뒤로가기
         </button>
         <h1 className="text-2xl font-bold text-amber-600 tracking-widest uppercase">수사 자료실</h1>
@@ -69,7 +78,8 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
             <select 
             value={filterCrimeType} 
             onChange={(e) => setFilterCrimeType(e.target.value)}
-            className="bg-gray-800 text-gray-300 border border-gray-700 text-sm p-2 rounded-sm focus:outline-none focus:border-amber-600 cursor-pointer"
+            aria-label="범죄 유형으로 걸러보기"
+            className="bg-gray-800 text-gray-300 border border-gray-700 text-base p-2 rounded-sm focus:outline-none focus:border-amber-600 cursor-pointer"
             >
             <option value="ALL">전체 사건</option>
             <option value="살인">살인</option>
@@ -101,18 +111,31 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
                 <button
                   key={scenario._id}
                   onClick={() => handleScenarioClick(scenario._id)}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 p-6 text-left rounded-sm shadow-lg transition-all group relative overflow-hidden"
+                  disabled={!!openingId}
+                  className={`bg-gray-800 border border-gray-700 p-6 text-left rounded-sm shadow-lg transition-all group relative overflow-hidden ${
+                    openingId === scenario._id
+                      ? 'opacity-100 border-amber-600'
+                      : openingId
+                        ? 'opacity-40'
+                        : 'hover:bg-gray-700'
+                  }`}
                 >
                   <div className="absolute top-0 left-0 w-1 h-full bg-amber-800 group-hover:bg-amber-600 transition-colors"></div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-gray-200 group-hover:text-amber-400 transition-colors flex items-center gap-2">
                       <FolderOpen size={18} /> {scenario.title}
                     </h3>
-                    <span className="text-xs text-gray-500 font-mono">{new Date(scenario.created_at).toLocaleDateString()}</span>
+                    {openingId === scenario._id ? (
+                      <span className="text-xs text-amber-500 font-mono flex items-center gap-1.5 shrink-0">
+                        <RefreshCw size={12} className="animate-spin" /> 여는 중
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500 font-mono shrink-0">{new Date(scenario.created_at).toLocaleDateString()}</span>
+                    )}
                   </div>
                   <p className="text-sm text-gray-400 line-clamp-2 pl-6">{scenario.summary}</p>
                   <div className="mt-3 pl-6">
-                    <span className={`text-[10px] px-2 py-1 rounded border uppercase tracking-wider
+                    <span className={`text-[0.625rem] px-2 py-1 rounded border uppercase tracking-wider
                         ${scenario.crime_type === '살인' ? 'bg-red-950/50 border-red-900 text-red-400' : 'bg-gray-900 border-gray-700 text-gray-500'}
                     `}>
                       {scenario.crime_type}
@@ -129,16 +152,16 @@ export default function LoadScenarioScreen({ onLoad, onBack }: LoadScenarioScree
       <div className="mt-8 flex gap-4 z-10">
         <button
           onClick={() => setPage(p => Math.max(1, p - 1))}
-          disabled={page === 1 || loading}
-          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
+          disabled={page === 1 || loading || !!openingId}
+          className="px-4 min-h-[2.75rem] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
         >
           <ChevronLeft size={16} /> 이전 페이지
         </button>
         <span className="flex items-center px-4 font-mono text-gray-500">Page {page}</span>
         <button
           onClick={() => setPage(p => p + 1)}
-          disabled={scenarios.length < 10 || loading}
-          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
+          disabled={scenarios.length < 10 || loading || !!openingId}
+          className="px-4 min-h-[2.75rem] bg-gray-800 hover:bg-gray-700 disabled:opacity-50 border border-gray-600 rounded-sm flex items-center gap-2"
         >
           다음 페이지 <ChevronRight size={16} />
         </button>

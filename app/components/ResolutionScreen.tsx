@@ -6,7 +6,7 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle } from 'lucide-react';
+import { FileText, User, ShieldAlert, RefreshCw, Eye, EyeOff, X, Skull, Microscope, MessageSquare, Send, CheckCircle, Archive } from 'lucide-react';
 import { Evaluation, CaseData, DeductionInput } from '../types/game';
 import { submitFeedback } from '../lib/api';
 
@@ -15,11 +15,13 @@ interface ResolutionScreenProps {
   caseData: CaseData;
   deductionInput?: DeductionInput;
   onReset: () => void;
+  /** 새 사건 생성(159원·횟수 제한)을 거치지 않는 경로. */
+  onGoToArchive: () => void;
 }
 
 const FEEDBACK_MAX_LENGTH = 300;
 
-export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset }: ResolutionScreenProps) {
+export default function ResolutionScreen({ evaluation, caseData, deductionInput, onReset, onGoToArchive }: ResolutionScreenProps) {
   const [showTruth, setShowTruth] = useState(evaluation.isCorrect);
   const [showBriefing, setShowBriefing] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -95,7 +97,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
         {/* Header */}
         <div className="text-center border-b border-gray-700/50 pb-6">
           <h2 className="text-2xl text-gray-200 font-bold tracking-widest uppercase shadow-black drop-shadow-md">수사 결과 보고서</h2>
-          <p className="text-gray-400 text-[10px] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
+          <p className="text-gray-400 text-[0.625rem] mt-2 font-mono">CASE ID: {evaluation.caseNumber || new Date().getTime().toString().slice(-6)}</p>
         </div>
 
         <div className="flex flex-col md:flex-row gap-8 items-start">
@@ -128,7 +130,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
             </div>
             
             {/* Caption */}
-            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100 min-h-[40px]">
+            <div className="text-center font-handwriting text-gray-800 text-xl font-bold pb-2 border-b border-gray-100 min-h-[2.5rem]">
               진범: {showTruth ? evaluation.culpritName : '???'}
             </div>
             <div className="flex justify-between px-2 pt-2 font-mono text-xs text-gray-500">
@@ -213,6 +215,12 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
             className="w-full md:w-auto bg-amber-800 hover:bg-amber-700 text-amber-100 py-4 px-12 rounded-sm font-bold shadow-lg border border-amber-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
           >
             <RefreshCw size={20} /> 새로운 사건 맡기
+          </button>
+          <button
+            onClick={onGoToArchive}
+            className="w-full md:w-auto bg-gray-800 hover:bg-gray-700 text-gray-200 py-4 px-8 rounded-sm font-bold shadow-lg border border-gray-600 transition-all transform hover:-translate-y-1 flex items-center justify-center gap-3 text-lg"
+          >
+            <Archive size={20} /> 지난 사건 맡기
           </button>
           <button
             onClick={() => setShowFeedback(true)}
@@ -374,7 +382,7 @@ export default function ResolutionScreen({ evaluation, caseData, deductionInput,
                       rows={6}
                       className="w-full bg-black/40 border border-gray-700 focus:border-amber-700 focus:outline-none text-gray-200 text-sm p-3 rounded-sm resize-none font-serif placeholder-gray-600"
                     />
-                    <div className="absolute bottom-2 right-3 text-[10px] font-mono text-gray-500">
+                    <div className="absolute bottom-2 right-3 text-[0.625rem] font-mono text-gray-500">
                       {feedbackText.length} / {FEEDBACK_MAX_LENGTH}
                     </div>
                   </div>
