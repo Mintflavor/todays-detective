@@ -670,7 +670,9 @@ export default function InvestigationScreen({
                           key={i}
                           type="button"
                           onClick={() => {
-                            setSelectedEvidenceName?.(ev.name);
+                            setSelectedEvidenceName?.(
+                              selectedEvidenceName === ev.name ? null : ev.name
+                            );
                             setEvidenceMenuOpen(false);
                           }}
                           className={`w-full rounded-[2px] p-2 text-left transition-colors ${
@@ -740,10 +742,11 @@ export default function InvestigationScreen({
             </div>
             <CaseFileRail
               caseData={caseData}
+              selectedEvidenceName={selectedEvidenceName}
               onPresentEvidence={
                 !isNotebook
                   ? (name) => {
-                      setSelectedEvidenceName?.(name);
+                      setSelectedEvidenceName?.(selectedEvidenceName === name ? null : name);
                       setFileOpen(false);
                     }
                   : undefined
@@ -778,10 +781,11 @@ export default function InvestigationScreen({
             <div className="td-scroll max-h-[calc(78dvh-4.5rem)] overflow-y-auto px-4 py-4 pb-safe">
               <CaseFileRail
                 caseData={caseData}
+                selectedEvidenceName={selectedEvidenceName}
                 onPresentEvidence={
                   !isNotebook
                     ? (name) => {
-                        setSelectedEvidenceName?.(name);
+                        setSelectedEvidenceName?.(selectedEvidenceName === name ? null : name);
                         setFileOpen(false);
                       }
                     : undefined
